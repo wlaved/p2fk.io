@@ -7,10 +7,10 @@ namespace p2fk.io.Controllers
 {
     [Route("[controller]")]
     [ApiController]
-    public class GetObjectsByAddressController : ControllerBase
+    public class GetObjectsCreatedByAddressController : ControllerBase
     {
        
-        // GET <GetObjectsByAddressController>/5
+        // GET <GetObjectsCreatedByAddressController>/5
         [HttpGet("{address}")]
         public ActionResult Get(string address, int skip = 0, int qty = -1, bool mainnet = true, bool verbose = false)
         {
@@ -26,13 +26,13 @@ namespace p2fk.io.Controllers
 
                 if (mainnet)
                 {
-                    arguments = "--versionbyte " + wrapper.ProdVersionByte + " --getobjectsbyaddress --password " + wrapper.ProdRPCPassword + " --url " + wrapper.ProdRPCURL + " --username " + wrapper.ProdRPCUser + " --skip " + skip + " --qty " + qty + " --address " + address;
+                    arguments = "--versionbyte " + wrapper.ProdVersionByte + " --getobjectscreatedbyaddress --password " + wrapper.ProdRPCPassword + " --url " + wrapper.ProdRPCURL + " --username " + wrapper.ProdRPCUser + " --skip " + skip + " --qty " + qty + " --address " + address;
                     if (verbose) { arguments = arguments + " --verbose"; }
                     result = wrapper.RunCommand(wrapper.ProdCLIPath, arguments);
                 }
                 else
                 {
-                    arguments = "--versionbyte " + wrapper.TestVersionByte + " --getobjectsbyaddress --password " + wrapper.TestRPCPassword + " --url " + wrapper.TestRPCURL + " --username " + wrapper.TestRPCUser + " --skip " + skip + " --qty " + qty + " --address " + address;
+                    arguments = "--versionbyte " + wrapper.TestVersionByte + " --getobjectscreatedbyaddress --password " + wrapper.TestRPCPassword + " --url " + wrapper.TestRPCURL + " --username " + wrapper.TestRPCUser + " --skip " + skip + " --qty " + qty + " --address " + address;
                     if (verbose) { arguments = arguments + " --verbose"; }
                     result = wrapper.RunCommand(wrapper.TestCLIPath, arguments);
                 }

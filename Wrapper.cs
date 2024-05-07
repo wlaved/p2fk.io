@@ -7,11 +7,19 @@ namespace p2fk.io
 {
     public class Wrapper
     {
-        public string CLIPath = @"C:\SUP\SUP.exe"; // Replace with the actual path to SUP.EXE
-        public string VersionByte = @"111"; // Replace with the actual version byte
-        public string RPCURL = @"http://127.0.0.1:18332";
-        public string RPCUser = "good-user";
-        public string RPCPassword = "better-password";
+        //default mainnet connection info
+        public string ProdCLIPath = @"C:\SUP\SUP.exe"; // Replace with the actual path to SUP.EXE
+        public string ProdVersionByte = @"0"; // Replace with the actual version byte
+        public string ProdRPCURL = @"http://127.0.0.1:8332";
+        public string ProdRPCUser = "good-user";
+        public string ProdRPCPassword = "better-password";
+
+        //default testnet connection info
+        public string TestCLIPath = @"C:\SUP\SUP.exe"; // Replace with the actual path to SUP.EXE
+        public string TestVersionByte = @"111"; // Replace with the actual version byte
+        public string TestRPCURL = @"http://127.0.0.1:18332";
+        public string TestRPCUser = "good-user";
+        public string TestRPCPassword = "better-password";
 
         public string RunCommand(string executablePath, string arguments)
         {

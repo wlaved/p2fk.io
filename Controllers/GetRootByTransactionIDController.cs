@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using static Microsoft.Extensions.Logging.EventSource.LoggingEventSource;
 
 
 namespace p2fk.io.Controllers
@@ -14,7 +15,7 @@ namespace p2fk.io.Controllers
 
         // GET <GetRootByTransactionIDController>/5
         [HttpGet("{id}")]
-        public ActionResult Get(string id)
+        public ActionResult Get(string id, bool mainnet = true, bool verbose = false)
         {
             // Regular expression for cryptocurrency transaction ID validation
             string pattern = @"^[0-9a-fA-F]{64}$";
@@ -23,10 +24,21 @@ namespace p2fk.io.Controllers
             {
                 Wrapper wrapper = new Wrapper();
 
-                string arguments = "--versionbyte " + wrapper.VersionByte + " --getrootbytransactionid --password " + wrapper.RPCPassword + " --url " + wrapper.RPCURL + " --username " + wrapper.RPCUser + " --tid " + id;
-
                 string result = "";
-                result = wrapper.RunCommand(wrapper.CLIPath, arguments);
+                string arguments = "";
+
+                if (mainnet)
+                {
+                    arguments = "--versionbyte " + wrapper.ProdVersionByte + " --getrootbytransactionid --password " + wrapper.ProdRPCPassword + " --url " + wrapper.ProdRPCURL + " --username " + wrapper.ProdRPCUser +" --tid " + id;
+                    if (verbose) { arguments = arguments + " --verbose"; }
+                    result = wrapper.RunCommand(wrapper.ProdCLIPath, arguments);
+                }
+                else
+                {
+                    arguments = "--versionbyte " + wrapper.TestVersionByte + " --getrootbytransactionid --password " + wrapper.TestRPCPassword + " --url " + wrapper.TestRPCURL + " --username " + wrapper.TestRPCUser + " --tid " + id;
+                    if (verbose) { arguments = arguments + " --verbose"; }
+                    result = wrapper.RunCommand(wrapper.TestCLIPath, arguments);
+                }
 
                 return Content(result, "application/json");
             }

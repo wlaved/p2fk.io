@@ -7,37 +7,38 @@ namespace p2fk.io.Controllers
 {
     [Route("[controller]")]
     [ApiController]
-    public class GetRootsByAddressController : ControllerBase
+    public class GetPrivateMessagesByAddressController : ControllerBase
     {
 
-        // GET <GetRootsByAddressController>/5
+        // GET <GetPrivateMessagesByAddressController>/5
         [HttpGet("{address}")]
-        public ActionResult Get(string address, bool mainnet = true, bool verbose = false)
+        public ActionResult Get(string address, int skip=0, int qty = 10, bool mainnet = true)
         {
             // Regular expression for cryptocurrency address validation
             string pattern = @"^[a-zA-Z0-9][a-km-zA-HJ-NP-Z1-9]{25,34}$";
             if (Regex.IsMatch(address, pattern))
             {
                 Wrapper wrapper = new Wrapper();
-                string result = "";
+
                 string arguments = "";
+                string result = "";
 
                 if (mainnet)
                 {
-                    arguments = "--versionbyte " + wrapper.ProdVersionByte + " --getrootsbyaddress --password " + wrapper.ProdRPCPassword + " --url " + wrapper.ProdRPCURL + " --username " + wrapper.ProdRPCUser + " --address " + address;
-                    if (verbose) { arguments = arguments + " --verbose"; }
+                    arguments = "--versionbyte " + wrapper.ProdVersionByte + " --getprivatemessagesbyaddress --password " + wrapper.ProdRPCPassword + " --url " + wrapper.ProdRPCURL + " --username " + wrapper.ProdRPCUser + " --skip " + skip + " --qty " + qty + " --address " + address;
                     result = wrapper.RunCommand(wrapper.ProdCLIPath, arguments);
                 }
-                else
-                {
-                    arguments = "--versionbyte " + wrapper.TestVersionByte + " --getrootsbyaddress --password " + wrapper.TestRPCPassword + " --url " + wrapper.TestRPCURL + " --username " + wrapper.TestRPCUser + " --address " + address;
-                    if (verbose) { arguments = arguments + " --verbose"; }
+                else { arguments = "--versionbyte " + wrapper.TestVersionByte + " --getprivatemessagesbyaddress --password " + wrapper.TestRPCPassword + " --url " + wrapper.TestRPCURL + " --username " + wrapper.TestRPCUser + " --skip " + skip + " --qty " + qty + " --address " + address;
                     result = wrapper.RunCommand(wrapper.TestCLIPath, arguments);
                 }
+                           
+                
+
 
                 return Content(result, "application/json");
             }
             else { return Content("[\"invalid address format\"]", "application/json"); }
+
         }
 
 

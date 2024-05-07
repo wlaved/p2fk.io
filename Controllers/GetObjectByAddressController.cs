@@ -12,7 +12,7 @@ namespace p2fk.io.Controllers
        
         // GET <GetObjectByAddressController>/5
         [HttpGet("{address}")]
-        public ActionResult Get(string address)
+        public ActionResult Get(string address, bool mainnet = true, bool verbose = false)
         {
             // Regular expression for cryptocurrency address validation
             string pattern = @"^[a-zA-Z0-9][a-km-zA-HJ-NP-Z1-9]{25,34}$";
@@ -20,12 +20,24 @@ namespace p2fk.io.Controllers
             {
                 Wrapper wrapper = new Wrapper();
 
-                string cliPath = "C:\\SUP\\SUP.exe"; // Replace with the actual path to SUP.EXE
-                string arguments = "--versionbyte " + wrapper.VersionByte + " --getobjectbyaddress --password " + wrapper.RPCPassword + " --url " + wrapper.RPCURL + " --username " + wrapper.RPCUser + " --address " + address;
-
+                string arguments = "";
                 string result = "";
+
+                if (mainnet)
+                {
+                    arguments = "--versionbyte " + wrapper.ProdVersionByte + " --getobjectbyaddress --password " + wrapper.ProdRPCPassword + " --url " + wrapper.ProdRPCURL + " --username " + wrapper.ProdRPCUser + " --address " + address;
+                    if (verbose) { arguments = arguments + " --verbose"; }
+                    result = wrapper.RunCommand(wrapper.ProdCLIPath, arguments);
+                }
+                else { arguments = "--versionbyte " + wrapper.TestVersionByte + " --getobjectbyaddress --password " + wrapper.TestRPCPassword + " --url " + wrapper.TestRPCURL + " --username " + wrapper.TestRPCUser + " --address " + address;
+                    if (verbose) { arguments = arguments + " --verbose"; }
+                    result = wrapper.RunCommand(wrapper.TestCLIPath, arguments);
+                }
+
+
+               
                 
-                result = wrapper.RunCommand(cliPath, arguments);
+
 
                 return Content(result, "application/json");
             }

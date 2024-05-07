@@ -19,7 +19,7 @@ var app = builder.Build();
         <style>
             .swagger-ui img  {
                 content: url('https://avatars.githubusercontent.com/u/6278955?s=400&v=4');
-                width: 80px;
+                width: 50px;
                 height: auto;
             }
         </style>";
