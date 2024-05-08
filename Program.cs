@@ -9,7 +9,8 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
   app.UseSwagger();
-  app.UseSwaggerUI(options =>
+app.UseStaticFiles();
+app.UseSwaggerUI(options =>
     {
         //removes the /swagger/ from the path
         options.RoutePrefix = string.Empty;
@@ -18,9 +19,12 @@ var app = builder.Build();
         options.DisplayRequestDuration();
 
         options.HeadContent = @"
+        <link rel=""apple-touch-icon"" sizes=""180x180"" href=""./apple-touch-icon.png"" />
+        <link rel=""icon"" type=""image/png"" sizes=""32x32"" href=""./favicon-32x32.png"" />
+        <link rel=""icon"" type=""image/png"" sizes=""16x16"" href=""./favicon-16x16.png"" />
         <style>
             .swagger-ui img  {
-                content: url('https://avatars.githubusercontent.com/u/6278955?s=400&v=4');
+                content: url('./HugPuddle.jpg');
                 width: 50px;
                 height: auto;
             }
