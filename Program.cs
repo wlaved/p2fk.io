@@ -14,10 +14,16 @@ app.UseSwaggerUI(options =>
     {
         //removes the /swagger/ from the path
         options.RoutePrefix = string.Empty;
+
+        //update to incude your own api and version
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "P2FK.IO V1");
+
+        //update to incude your own api 
         options.DocumentTitle = "p2fk.io";
+
         options.DisplayRequestDuration();
 
+        //update to use your own images and favicons
         options.HeadContent = @"
         <link rel=""apple-touch-icon"" sizes=""180x180"" href=""./apple-touch-icon.png"" />
         <link rel=""icon"" type=""image/png"" sizes=""32x32"" href=""./favicon-32x32.png"" />
@@ -29,7 +35,6 @@ app.UseSwaggerUI(options =>
                 height: auto;
             }
         </style>";
-
 
 
         //added because large json output styling slows down the swagger ui
