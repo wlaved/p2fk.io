@@ -10,6 +10,8 @@ The latest release of Sup!? with CLI can be found here: https://github.com/embii
 2. run SUP.EXE,  click the 🗝️ icon, launch and sync both bitcoin wallets.
 
 
+
+
 NOTICE: Update the Wrapper.cs file if you wish to use something other then the following default values 
 
 # defaults:
@@ -27,6 +29,8 @@ NOTICE: Update the Wrapper.cs file if you wish to use something other then the f
         public string TestRPCURL = @"http://127.0.0.1:18332";
         public string TestRPCUser = "good-user";
         public string TestRPCPassword = "better-password";
+
+
 
 
 NOTICE: Update Program.cs if you wish to use images other then what is defaulted or change the titles
@@ -63,6 +67,8 @@ NOTICE: Update Program.cs if you wish to use images other then what is defaulted
          {
              ["activated"] = false
          };
+
+
 
 
 
