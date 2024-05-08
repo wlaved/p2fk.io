@@ -14,7 +14,7 @@ The latest release of Sup!? with CLI can be found here: https://github.com/embii
 
 NOTICE: Update the Wrapper.cs file if you wish to use something other then the following default values 
 
-# defaults:
+DEFAULTS:
 
         //default mainnet connection info
         public string ProdCLIPath = @"C:\SUP\SUP.exe"; // Replace with the actual path to SUP.EXE
@@ -35,7 +35,7 @@ NOTICE: Update the Wrapper.cs file if you wish to use something other then the f
 
 NOTICE: Update Program.cs if you wish to use images other then what is defaulted or change the titles
 
-# defaults:
+DEFAULTS:
 
         //removes the /swagger/ from the path
         options.RoutePrefix = string.Empty;
