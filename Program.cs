@@ -11,7 +11,9 @@ var app = builder.Build();
   app.UseSwagger();
   app.UseSwaggerUI(options =>
     {
-
+        //removes the /swagger/ from the path
+        options.RoutePrefix = string.Empty;
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "P2FK.IO V1");
         options.DocumentTitle = "p2fk.io";
         options.DisplayRequestDuration();
 
