@@ -1,6 +1,6 @@
-@p2fk.io_HostAddress = http://localhost:5184
+@P2FK.IO_HostAddress = http://localhost:5184
 
-GET {{p2fk.io_HostAddress}}/weatherforecast/
+GET {{P2FK.IO_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###

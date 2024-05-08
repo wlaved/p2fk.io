@@ -1,5 +1,5 @@
-﻿# p2fk.io
-p2fk.io is a simple .NET API wrapper allowing developers to interact with the Sup!? CLI via the traditional web.
+﻿# P2FK.IO
+P2FK.IO is a simple .NET API wrapper allowing developers to interact with the Sup!? CLI via the traditional web.
 
 
 
@@ -10,11 +10,12 @@ The latest release of Sup!? with CLI can be found here: https://github.com/embii
 2. run SUP.EXE,  click the 🗝️ icon, launch and sync both bitcoin wallets.
 
 
+#LIVE DEMO
+https://p2fk.io
 
 
 NOTICE: Update the Wrapper.cs file if you wish to use something other then the following default values 
-
-DEFAULTS:
+#DEFAULTS:
 
         //default mainnet connection info
         public string ProdCLIPath = @"C:\SUP\SUP.exe"; // Replace with the actual path to SUP.EXE
@@ -34,8 +35,7 @@ DEFAULTS:
 
 
 NOTICE: Update Program.cs if you wish to use images other then what is defaulted or change the titles
-
-DEFAULTS:
+#DEFAULTS:
 
         //removes the /swagger/ from the path
         options.RoutePrefix = string.Empty;
@@ -44,7 +44,7 @@ DEFAULTS:
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "P2FK.IO V1");
 
         //update to incude your own api 
-        options.DocumentTitle = "p2fk.io";
+        options.DocumentTitle = "P2FK.IO";
 
         options.DisplayRequestDuration();
 
@@ -72,6 +72,7 @@ DEFAULTS:
 
 
 
-Requires ASP.NET Core Windows Hosting Bundle. ( install after IIS )
+NOTICE: Requires ASP.NET Core Windows Hosting Bundle. ( install after IIS )
 
 https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-aspnetcore-8.0.4-windows-hosting-bundle-installer 
+

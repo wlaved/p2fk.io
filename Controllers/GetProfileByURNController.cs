@@ -2,7 +2,7 @@
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
-namespace p2fk.io.Controllers
+namespace P2FK.IO.Controllers
 {
     [Route("[controller]")]
     [ApiController]

@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 using static Microsoft.Extensions.Logging.EventSource.LoggingEventSource;
 
 
-namespace p2fk.io.Controllers
+namespace P2FK.IO.Controllers
 {
     [Route("[controller]")]
     [ApiController]

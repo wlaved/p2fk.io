@@ -3,7 +3,7 @@ using System.Reflection;
 using System.Text;
 using static System.Net.WebRequestMethods;
 
-namespace p2fk.io
+namespace P2FK.IO
 {
     public class Wrapper
     {

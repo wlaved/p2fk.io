@@ -8,7 +8,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-  app.UseSwagger();
+app.UseSwagger();
 app.UseStaticFiles();
 app.UseSwaggerUI(options =>
     {
@@ -19,7 +19,7 @@ app.UseSwaggerUI(options =>
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "P2FK.IO V1");
 
         //update to incude your own api 
-        options.DocumentTitle = "p2fk.io";
+        options.DocumentTitle = "P2FK.IO";
 
         options.DisplayRequestDuration();
 
