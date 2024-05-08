@@ -6,7 +6,7 @@ p2fk.io is a simple .NET API wrapper allowing developers to interact with the Su
 # How to Sync Sup!?
 The latest release of Sup!? with CLI can be found here: https://github.com/embiimob/SUP
 
-1. 1. create a folder C:\SUP and unzip the latest release into it.
+1. create a folder C:\SUP and unzip the latest release into it.
 2. run SUP.EXE,  click the 🗝️ icon, launch and sync both bitcoin wallets.
 
 
