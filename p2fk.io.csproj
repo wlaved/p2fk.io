@@ -15,6 +15,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="ROOTS-PROCESSING" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="wwwroot\apple-touch-icon.png" />
+    <None Include="wwwroot\favicon-16x16.png" />
+    <None Include="wwwroot\favicon-32x32.png" />
+    <None Include="wwwroot\HugPuddle.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
   </ItemGroup>
 

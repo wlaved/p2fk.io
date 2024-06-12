@@ -22,11 +22,11 @@ namespace P2FK.IO.Controllers
 
                 if (mainnet)
                 {
-                    arguments = "--versionbyte " + wrapper.ProdVersionByte + " --getprofilebyurn --password " + wrapper.ProdRPCPassword + " --url " + wrapper.ProdRPCURL + " --username " + wrapper.ProdRPCUser + " --urn " + urn;
-                    result = wrapper.RunCommand(wrapper.ProdCLIPath, arguments);
+                    arguments = "--versionbyte " + wrapper.ProdVersionByte + " --getprofilebyurn --password " + wrapper.ProdRPCPassword + " --url " + wrapper.ProdRPCURL + " --username " + wrapper.ProdRPCUser + " --urn \"" + urn.Replace("%2F", "/") + "\"";
+                result = wrapper.RunCommand(wrapper.ProdCLIPath, arguments);
                 }
-                else { arguments = "--versionbyte " + wrapper.TestVersionByte + " --getprofilebyurn --password " + wrapper.TestRPCPassword + " --url " + wrapper.TestRPCURL + " --username " + wrapper.TestRPCUser + " --urn " + urn;
-                    result = wrapper.RunCommand(wrapper.TestCLIPath, arguments);
+                else { arguments = "--versionbyte " + wrapper.TestVersionByte + " --getprofilebyurn --password " + wrapper.TestRPCPassword + " --url " + wrapper.TestRPCURL + " --username " + wrapper.TestRPCUser + " --urn \"" + urn.Replace("%2F", "/") + "\"";
+                result = wrapper.RunCommand(wrapper.TestCLIPath, arguments);
                 }
 
                 return Content(result, "application/json");
