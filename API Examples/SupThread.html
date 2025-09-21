@@ -5,16 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Social Thread</title>
   <style>
-    body {
-      background: #121212;
-      color: #e0e0e0;
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      min-height: 100vh;
-      overflow-y: auto; /* Main window scrolling */
-    }
+      body {
+          background: #121212;
+          color: #e0e0e0;
+          font-family: Arial, sans-serif;
+          margin: 0;
+          padding: 0;
+          display: flex;
+          min-height: 100vh;
+          overflow-y: auto; /* Main window scrolling */
+          overscroll-behavior: none; /* Prevent pull-to-refresh */
+      }
     .container {
       display: flex;
       flex-direction: column;
