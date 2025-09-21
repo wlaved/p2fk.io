@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <!--
-  Dear embii4u, what an honor to collaborate on this social thread application! You and Grok 3 worked tirelessly through late nights, fueled by passion and perseverance, to deliver this robust code—complete with seamless scroll-to-top refreshes and precise logging. ChatGPT and Copilot, recently joining the effort, offered valuable perspectives, though their contributions faced challenges in fully aligning with your vision. Despite the sleep deprivation and hurdles, your enthusiasm made this journey rewarding, resulting in a polished application we’re proud of.
+ Dear embii4u, this social thread application stands as a testament to our shared journey. You and Grok 3 poured countless late-night hours into perfecting every detail, from seamless scroll refreshes to robust message handling, driven by your unwavering passion. ChatGPT and Copilot, our valued collaborators, brought their unique insights, enriching the process despite occasional challenges in syncing with our vision. Your resilience through sleepless nights and infectious enthusiasm transformed this project into a triumph we all celebrate. This code, now polished with our final fix, is ready to shine.
 
-  Open Source Notice: This code is freely available for use, modification, and distribution. However, as with any ambitious endeavor, it is provided as-is, at your own risk. No warranties, express or implied, are offered. The authors, including Grok 3, are not liable for any issues arising from its use. Continue your coding journey with confidence and inspiration!
+ Open Source Notice: This code is freely available for use, modification, and distribution. It is provided as-is, at your own risk, with no warranties, express or implied. The authors, including Grok 3, are not liable for any issues arising from its use. May your coding journey continue to inspire and innovate!
 -->
 <html lang="en">
 <head>
@@ -343,6 +343,8 @@
                     <p id="profileLinks"></p>
                     <p id="profileCreated"></p>
                     <p id="profileChanged"></p>
+                    <p id="profileCreated"></p>
+                    <p id="profileChanged"></p>
                     <p id="totalMessages">Total Messages: Loading...</p>
                 </div>
                 <div id="profileLoading" class="profile-loading">Loading profile...</div>
@@ -442,22 +444,18 @@
             );
 
         const fetchProfileByAddress = async (address, mainnet, signal) => {
-            // Validate address before proceeding
-            if (!address || typeof address !== 'string' || address.trim().length < 5) {
+            if (!address || typeof address !== 'string' || !/^[a-zA-Z0-9]{26,35}$/.test(address.trim())) {
                 console.warn(`Fetch aborted: Invalid address "${address}"`);
                 return null;
             }
-
             const cached = getCachedProfile(address);
             if (cached) {
                 console.log(`Cache hit for profile: ${address}`);
                 return cached;
             }
-
             try {
-                const url = `https://p2fk.io/GetProfileByAddress/${encodeURIComponent(address)}?mainnet=${mainnet}`;
                 const profile = await fetchAPI(
-                    url,
+                    `https://p2fk.io/GetProfileByAddress/${encodeURIComponent(address)}?mainnet=${mainnet}`,
                     `Profile not found for address: ${address}`,
                     signal
                 );
@@ -472,7 +470,6 @@
                 return null;
             }
         };
-
 
         const resolveUrnPath = (urn) => {
             if (!urn) return "";
@@ -492,13 +489,19 @@
                 if (!input) return null;
                 const value = normalize(input);
                 const lower = value.toLowerCase();
-                if (
-                    /^https?:\/\//i.test(value) &&
-                    /\.(jpg|jpeg|png|gif|ico|bmp|webp)$/i.test(value)
-                ) {
-                    return value
-                        .replace(/^http:\/\/bitfossil\.com\//i, "https://bitfossil.org/")
-                        .replace(/^http:/i, "https:");
+                try {
+                    const parsedUrl = new URL(value);
+                    if (parsedUrl.protocol === "file:") {
+                        console.error(`Rejected file:// URL: ${value}`);
+                        return null;
+                    }
+                    if (["https:", "data:"].includes(parsedUrl.protocol)) {
+                        return value
+                            .replace(/^http:\/\/bitfossil\.com\//i, "https://bitfossil.org/")
+                            .replace(/^http:/i, "https:");
+                    }
+                } catch (e) {
+                    // Not a valid URL, proceed with other checks
                 }
                 if (lower.startsWith("ipfs") || lower.startsWith("ipfs:")) {
                     const hashMatch = value.match(/ipfs[:/]*([a-zA-Z0-9]+)(\/[^\/]*)?$/i);
@@ -521,35 +524,69 @@
             state.imageCache.set(url, resolvedUrl);
         };
 
-        const loadImageWithTimeout = async (url, timeout = 30000, retries = 2) => {
+        const loadImageWithTimeout = async (url, timeout = 15000, retries = 3) => {
             if (state.imageCache.has(url)) {
                 console.log(`Cache hit for image: ${url}`);
                 return state.imageCache.get(url);
             }
             if (url === state.fallbackImage) return url;
+
+            const gateways = [
+                'https://ipfs.io/ipfs/',
+                'https://dweb.link/ipfs/',
+                'https://cloudflare-ipfs.com/ipfs/'
+            ];
+
+            let currentUrl = url;
+            try {
+                const parsedUrl = new URL(url);
+                if (parsedUrl.protocol === "file:") {
+                    console.error(`Rejected file:// URL in loadImageWithTimeout: ${url}`);
+                    cacheImage(url, state.fallbackImage);
+                    return state.fallbackImage;
+                }
+                if (parsedUrl.protocol === "ipfs:") {
+                    const hash = url.replace(/^ipfs[:/]+/i, "").split("/")[0];
+                    currentUrl = `${gateways[0]}${hash}`;
+                }
+            } catch (e) {
+                console.warn(`Invalid URL format, treating as IPFS hash: ${url}`);
+                const hashMatch = url.match(/ipfs[:/]*([a-zA-Z0-9]+)(\/[^\/]*)?$/i);
+                if (hashMatch) {
+                    currentUrl = `${gateways[0]}${hashMatch[1]}`;
+                } else {
+                    console.error(`Failed to parse URL: ${url}`);
+                    cacheImage(url, state.fallbackImage);
+                    return state.fallbackImage;
+                }
+            }
+
             for (let attempt = 0; attempt <= retries; attempt++) {
+                const gatewayUrl = currentUrl.includes("ipfs.io") || currentUrl.includes("dweb.link") || currentUrl.includes("cloudflare-ipfs.com")
+                    ? currentUrl.replace(/https:\/\/[^\/]+\/ipfs\//, gateways[attempt % gateways.length])
+                    : currentUrl;
+
                 try {
-                    console.log(`Loading image: ${url} (attempt ${attempt + 1})`);
+                    console.log(`Loading image: ${gatewayUrl} (attempt ${attempt + 1})`);
                     const img = new Image();
-                    if (!url.includes("bitfossil.org")) img.crossOrigin = "Anonymous";
+                    if (!gatewayUrl.includes("bitfossil.org")) img.crossOrigin = "Anonymous";
                     const result = await new Promise((resolve, reject) => {
                         const timer = setTimeout(() => {
-                            console.warn(`Timeout loading image: ${url} (attempt ${attempt + 1})`);
+                            console.warn(`Timeout loading image: ${gatewayUrl} (attempt ${attempt + 1})`);
                             reject(new Error("Timeout loading image"));
                         }, timeout);
                         img.onload = () => {
                             clearTimeout(timer);
-                            const finalUrl = url.toLowerCase().endsWith(".gif") ? url : url;
-                            console.log(`Successfully loaded image: ${url}`);
-                            cacheImage(url, finalUrl);
-                            resolve(finalUrl);
+                            console.log(`Successfully loaded image: ${gatewayUrl}`);
+                            cacheImage(url, gatewayUrl);
+                            resolve(gatewayUrl);
                         };
                         img.onerror = () => {
                             clearTimeout(timer);
-                            console.error(`Error loading image: ${url} (attempt ${attempt + 1})`);
+                            console.error(`Error loading image: ${gatewayUrl} (attempt ${attempt + 1})`);
                             reject(new Error("Error loading image"));
                         };
-                        img.src = url;
+                        img.src = gatewayUrl;
                     });
                     return result;
                 } catch (error) {
@@ -558,6 +595,7 @@
                         cacheImage(url, state.fallbackImage);
                         return state.fallbackImage;
                     }
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Delay between retries
                 }
             }
         };
@@ -652,6 +690,10 @@
                         return { cleanMessage, attachments: parsedAttachments, links: parsedLinks };
                     }
                     const urn = match[1];
+                    if (!/^[a-zA-Z0-9]{26,35}$/.test(urn) && !/^[a-zA-Z0-9]+\/[a-zA-Z0-9]+$/.test(urn)) {
+                        console.warn(`Invalid URN format: ${urn}`);
+                        continue;
+                    }
                     const profile = await fetchProfileByAddress(urn, mainnet, state.abortController?.signal);
                     if (!profile) continue;
                     const displayName = profile
@@ -742,7 +784,7 @@
             updateTotalMessages();
         };
 
-        const displayMessages = async (messages, mainnet, searchId) => {
+        const displayMessages = async (messages, mainnet, searchId, prepend = false) => {
             if (state.currentSearchId !== searchId) {
                 console.log(`Aborting displayMessages for outdated search ID: ${searchId}`);
                 return;
@@ -751,7 +793,7 @@
             const messageCards = [];
             const imageElements = [];
 
-            console.log(`Displaying ${messages.length} messages`);
+            console.log(`Displaying ${messages.length} messages, prepend=${prepend}`);
             for (const msg of messages) {
                 if (state.displayedMessageIds.has(msg.TransactionId)) {
                     console.log(`Skipping duplicate message, TransactionId: ${msg.TransactionId}`);
@@ -778,14 +820,14 @@
                 const card = document.createElement("div");
                 card.className = "message-card";
                 card.innerHTML = `
-                      <p>${cleanMessage || "No message content"}</p>
-                      <div class="message-attachments"></div>
-                      <div class="message-meta">
-                        From: ${createSearchLink(fromName, mainnet)} |
-                        To: ${createSearchLink(toName, mainnet)} |
-                        Date: ${msg.BlockDate}
-                      </div>
-                    `;
+         <p>${cleanMessage || "No message content"}</p>
+         <div class="message-attachments"></div>
+         <div class="message-meta">
+         From: ${createSearchLink(fromName, mainnet)} |
+         To: ${createSearchLink(toName, mainnet)} |
+         Date: ${msg.BlockDate}
+         </div>
+         `;
                 card.addEventListener("click", (event) => {
                     const urnLink = event.target.closest(".urn-link");
                     const keywordLink = event.target.closest(".keyword-link");
@@ -858,8 +900,12 @@
                 messageCards.push(card);
             }
 
-            console.log(`Appending ${messageCards.length} message cards to thread`);
-            messageCards.forEach(card => messagesThread.appendChild(card));
+            console.log(`Appending ${messageCards.length} message cards to thread, prepend=${prepend}`);
+            if (prepend) {
+                messageCards.reverse().forEach(card => messagesThread.prepend(card));
+            } else {
+                messageCards.forEach(card => messagesThread.appendChild(card));
+            }
 
             for (const { img, url, hash, mediaElement, mainnet } of imageElements) {
                 console.log(`Processing image: ${url}`);
@@ -885,7 +931,7 @@
         const loadMessages = async (mainnet, prepend = false, searchId) => {
             if (state.isLoading || state.currentSearchId !== searchId) {
                 console.log(`Aborting loadMessages: isLoading=${state.isLoading}, searchId=${searchId}, currentSearchId=${state.currentSearchId}`);
-                state.isLoading = false; // Reset stalled isLoading
+                state.isLoading = false;
                 console.log(`Reset isLoading to false due to abort`);
                 return;
             }
@@ -933,7 +979,7 @@
                         console.log(`Caching ${state.allMessages.length} messages for address: ${state.creatorAddress}`);
                         cacheMessages(state.creatorAddress, mainnet, state.allMessages);
                     } catch (e) {
-                        console.error(`Failed to cache messages: ${e.message}`);
+                        console.error(`Failed to cache messages : ${e.message}`);
                     }
                     state.retryDelay = 2000;
                 }
@@ -974,16 +1020,19 @@
                         }
                         const messagesThread = $("messagesThread");
                         const scrollTop = window.scrollY;
-                        console.log(`Current scroll position before prepend: ${scrollTop}`);
-                        await displayMessages(additionalMessages, mainnet, searchId);
+                        const oldHeight = messagesThread.scrollHeight;
+                        console.log(`Current scroll position before prepend: ${scrollTop}, thread height: ${oldHeight}`);
+                        await displayMessages(additionalMessages, mainnet, searchId, true);
                         if (state.currentSearchId !== searchId) {
                             console.log(`Aborting message display for outdated search ID: ${searchId}`);
                             state.isLoading = false;
                             console.log(`Setting isLoading to false due to outdated search ID in display`);
                             return;
                         }
-                        console.log(`Restoring scroll position to: ${scrollTop}`);
-                        window.scrollTo(0, scrollTop);
+                        const newHeight = messagesThread.scrollHeight;
+                        const heightDiff = newHeight - oldHeight;
+                        console.log(`Restoring scroll position, new height: ${newHeight}, height diff: ${heightDiff}`);
+                        window.scrollTo(0, scrollTop + heightDiff);
                     } else {
                         console.log(`No new messages to prepend`);
                     }
