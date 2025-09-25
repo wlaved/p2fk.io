@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <!--
-  Sup!? Lotto Terminal v5.34 — A Galactic Bitcoin Adventure
+  Sup!? Lotto Terminal v5.35 — A Galactic Bitcoin Adventure
   =======================================================
   What a ride! Together, we forged a decentralized lottery terminal that dances on the Bitcoin mainnet and testnet, powered by the raw energy of Sup!? (https://github.com/embiimob/SUP) and the P2FK.IO API. Late nights, copy-pasting messages into Sup!?, and watching blockchain data spark to life—it’s been a cyberpunk saga of creativity and grit. From sculpting a retro-futuristic UI to syncing lotteries with #MatrixCore, we’ve built a terminal that’s as bold as a neon-lit asteroid field. Here’s to the countless code sprints, blockchain brainstorms, and that sweet moment when the cards lit up with winners. 🚀🎰
 
@@ -11,7 +11,7 @@
 
   Technical Analysis
   =================
-  Astro Lotto Terminal v5.34 is a single-page HTML5 web app that brings decentralized lotteries to life by processing Bitcoin blockchain messages via Sup!?. Key highlights:
+  Sup!? Lotto Terminal v5.35 is a single-page HTML5 web app that brings decentralized lotteries to life by processing Bitcoin blockchain messages via Sup!?. Key highlights:
 
   - **Architecture**: A lean, modular JavaScript core with a PromiseQueue for concurrent API and IPFS requests, ensuring a snappy UI. Leverages moment.js for precise time handling in MDT, syncing with Bitcoin’s BlockDate.
   - **Data Flow**: Pulls messages from p2fk.io, parsing JSON and IPFS links (e.g., QmUYhka... for Star Trek GIFs) via extractJsonAndTag. Messages copied into Sup!? fuel lotteries (#LottoCreate, #LottoTicket), stored in memory-only Map caches for speed and CORS compliance.
@@ -32,10 +32,10 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Sup Lotto Terminal v5.34 — Production</title>
+    <title>Sup Lotto Terminal v5.35 — Production</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        /* Unchanged CSS from previous version */
+        /* Unchanged CSS from previous version with updates for issues */
         html, body {
             height: 100%;
             margin: 0;
@@ -155,6 +155,7 @@
             flex-direction: column;
             justify-content: flex-start;
             box-sizing: border-box;
+            position: relative;
         }
 
             .lotto-card:hover {
@@ -198,6 +199,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            z-index: 2;
         }
 
         .lotto-card .card-badge {
@@ -206,6 +208,7 @@
             border-radius: 6px;
             background: #002b00;
             color: #80cc99;
+            flex-shrink: 0;
         }
 
         .spoiled-badge {
@@ -215,15 +218,37 @@
             border-radius: 6px;
             display: inline-block;
             font-size: 11px;
+            flex-shrink: 0;
+        }
+
+        .lotto-image-container {
+            position: relative;
+            width: 100%;
+            height: 50px;
+            margin-top: 8px;
         }
 
         .lotto-image {
             width: 100%;
-            height: 50px;
+            height: 100%;
             object-fit: cover;
             border-radius: 8px;
-            margin-top: 8px;
             background: linear-gradient(180deg, #0b0b0b, #191919);
+        }
+
+        .lotto-image-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            color: #b3ccbb;
+            font-size: 10px;
+            padding: 4px;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .winner-highlight {
@@ -275,8 +300,9 @@
             }
 
         .lotto-card button {
-            margin-top: 8px;
-            align-self: flex-end;
+            position: absolute;
+            top: 135px; /* Adjusted to sit over image */
+            right: 10px;
             background: #00b33c;
             color: #000;
             border: none;
@@ -284,6 +310,7 @@
             border-radius: 6px;
             cursor: pointer;
             font-weight: 700;
+            z-index: 3;
         }
 
         .modal-overlay {
@@ -338,22 +365,23 @@
         .ticket-entry {
             background: #0b0b0b;
             border: 1px solid rgba(0,179,60,0.08);
-            padding: 10px;
+            padding: 15px;
             border-radius: 10px;
             font-size: 13px;
             color: #b3ccbb;
+            position: relative;
         }
 
             .ticket-entry img.ticket-image {
                 width: 100%;
                 max-height: 300px;
                 object-fit: cover;
-                margin-top: 8px;
+                margin-top: 15px;
                 border-radius: 8px;
             }
 
             .ticket-entry.winner {
-                border: 2px solid #ccac00;
+                border: 1px solid #ccac00; /* Thinner border for clarity */
                 background: #2a2a00;
                 position: relative;
             }
@@ -364,13 +392,19 @@
                     top: 0;
                     left: 0;
                     right: 0;
-                    background: rgba(204,172,0,0.8);
+                    background: rgba(204,172,0,0.7); /* Semi-transparent for readability */
                     color: #000;
                     font-size: 10px;
                     font-weight: 700;
                     text-align: center;
-                    padding: 4px;
+                    padding: 10px; /* Increased padding */
                     border-radius: 8px 8px 0 0;
+                    z-index: 1;
+                }
+
+                .ticket-entry.winner > * {
+                    position: relative;
+                    z-index: 2; /* Ensure content is above the overlay */
                 }
 
         .modal input, .modal select, .modal textarea {
@@ -392,11 +426,18 @@
             font-size: 12px;
             display: none;
         }
+
+        .truncate-keyword {
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
     <div class="terminal" id="terminal">
-        <div class="header">🚀 Sup!? LOTTO TERMINAL v5.34 🚀<br><small>Grid Matrix Jackpot — Production</small></div>
+        <div class="header">🚀 Sup!? LOTTO TERMINAL v5.35 🚀<br><small>Grid Matrix Jackpot — Production</small></div>
         <div class="status-thread" id="statusThread"><div>Ready.</div></div>
         <div class="network-section">
             <label for="mainnet">Mainnet:</label>
@@ -429,7 +470,7 @@
                 <div class="modal-header">✨ CREATE NEW LOTTO</div>
                 <div class="modal-body">
                     <label for="createLottoId">Keyword</label>
-                    <input id="createLottoId" placeholder="Keyword (max 20)">
+                    <input id="createLottoId" placeholder="Keyword (max 20)" maxlength="20">
                     <label for="createLottoType">Lotto Type</label>
                     <select id="createLottoType">
                         <option value="">Select Type</option>
@@ -498,7 +539,7 @@
         const MASTER_KEYWORD = "MatrixCore";
         const MESSAGE_KEYWORD = "#MatrixCore";
         const API_BASE = "https://p2fk.io";
-        const POLL_MS = 10000;
+        const POLL_MS = 15000;
         const NORMAL_FETCH_QTY = 500;
         const INIT_FETCH_QTY = 10000;
         const URN_CACHE_TIMEOUT = 3600000;
@@ -507,7 +548,7 @@
         const VALID_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
         const INITIAL_TICKET_RENDER_LIMIT = 50;
         const MAX_CONCURRENT_REQUESTS = 2;
-        const IMAGE_FETCH_DELAY_MS = 100;
+        const IMAGE_FETCH_DELAY_MS = 500;
         const IPFS_RETRY_ATTEMPTS = 3;
         const NON_IMAGE_EXTENSIONS = ['.txt', '.pdf', '.doc', '.docx', '.xls', '.xlsx'];
         const IPFS_GATEWAYS = ['https://ipfs.io/ipfs/', 'https://cloudflare-ipfs.com/ipfs/', 'https://gateway.pinata.cloud/ipfs/'];
@@ -602,7 +643,7 @@
         }
         function normalizeBaseId(raw) {
             if (!raw) return '';
-            return raw.trim().replace(/^#+/, '').replace(/\s+/g, '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+            return raw.trim().replace(/^#+/, '').replace(/\s+/g, '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().substring(0, 20);
         }
 
         /* ---------------------- Core: winner selection & session updates ---------------------- */
@@ -1036,28 +1077,33 @@
                 const statusBadge = session.status === 'SPOILED' ? `<span class="spoiled-badge">SPOILED</span>` : `<span class="card-badge">${session.status}</span>`;
                 let imgTag = '';
                 if (session.image && session.image.hash) {
-                    imgTag = `<div class="image-container">`;
+                    imgTag = `<div class="lotto-image-container">`;
                     if (imageData && imageData.isImage) {
                         imgTag += `<img src="${imageData.url}" class="lotto-image" alt="lotto image">`;
                     }
-                    if (session.winner) imgTag += `<div class="winner-highlight">Winner: ${winnerDisplay} 🏆</div>`;
+                    if (session.winner) {
+                        imgTag += `<div class="lotto-image-overlay">Winner: ${winnerDisplay} 🏆</div>`;
+                    } else if (session.message) {
+                        imgTag += `<div class="lotto-image-overlay">${session.message.length > 30 ? session.message.substring(0, 30) + '...' : session.message}</div>`;
+                    }
                     imgTag += `</div>`;
+                } else if (session.message && !session.winner) {
+                    imgTag += `<div class="lotto-message">${session.message.length > 30 ? session.message.substring(0, 30) + '...' : session.message}</div>`;
                 }
                 let html = `
-          <div class="card-top">
-            <div style="flex:1"><strong>#${base}</strong><div style="font-size:11px;color:#80cc99">${session.type || 'Unknown'} • ${session.prize || '—'}</div></div>
-            ${statusBadge}
-          </div>
-          <div class="lotto-meta">
-            Qty: ${session.qty} • SessionTickets: ${totalTickets} • AllTickets: ${allTickets}<br>
-            Open: ${session.start.format('YYYY-MM-DD HH:mm')}<br>
-            Close: ${session.end.format('YYYY-MM-DD HH:mm')}<br>
-            Tx: ${session.txid.substring(0, 8)}...<br>
-            Creator: <a href="#" class="${creatorClass}" data-addr="${session.creator}">${creatorDisplay}</a>
-            ${winnerDisplay ? `<br>Winner: <a href="#" data-addr="${session.winner}">${winnerDisplay} 🏆</a>` : ''}
-          </div>
-        `;
-                if (session.message) html += `<div class="lotto-message">${session.message.length > 30 ? session.message.substring(0, 30) + '...' : session.message}</div>`;
+              <div class="card-top">
+                <div style="flex:1"><strong class="truncate-keyword">#${base}</strong><div style="font-size:11px;color:#80cc99">${session.type || 'Unknown'} • ${session.prize || '—'}</div></div>
+                ${statusBadge}
+              </div>
+              <div class="lotto-meta">
+                Qty: ${session.qty} • SessionTickets: ${totalTickets} • AllTickets: ${allTickets}<br>
+                Open: ${session.start.format('YYYY-MM-DD HH:mm')}<br>
+                Close: ${session.end.format('YYYY-MM-DD HH:mm')}<br>
+                Tx: ${session.txid.substring(0, 8)}...<br>
+                Creator: <a href="#" class="${creatorClass}" data-addr="${session.creator}">${creatorDisplay}</a>
+                ${winnerDisplay ? `<br>Winner: <a href="#" data-addr="${session.winner}">${winnerDisplay} 🏆</a>` : ''}
+              </div>
+            `;
                 html += imgTag;
                 if (session.status === 'OPEN') html += `<button data-action="buy" data-base="${base}">🚀 BUY</button>`;
                 card.innerHTML = html;
@@ -1069,13 +1115,19 @@
                             cache.imageCache.set(session.image.hash, imgData);
                             const existingImg = card.querySelector('.lotto-image');
                             if (!existingImg) {
-                                const container = card.querySelector('.image-container') || card;
+                                const container = card.querySelector('.lotto-image-container') || card;
                                 const img = document.createElement('img');
                                 img.src = imgData.url;
                                 img.className = 'lotto-image';
                                 img.alt = 'lotto image';
-                                if (container.className === 'image-container') {
-                                    container.insertBefore(img, container.firstChild);
+                                if (container.className === 'lotto-image-container') {
+                                    if (session.winner) {
+                                        container.innerHTML = `<img src="${imgData.url}" class="lotto-image" alt="lotto image"><div class="lotto-image-overlay">Winner: ${winnerDisplay} 🏆</div>`;
+                                    } else if (session.message) {
+                                        container.innerHTML = `<img src="${imgData.url}" class="lotto-image" alt="lotto image"><div class="lotto-image-overlay">${session.message.length > 30 ? session.message.substring(0, 30) + '...' : session.message}</div>`;
+                                    } else {
+                                        container.innerHTML = `<img src="${imgData.url}" class="lotto-image" alt="lotto image">`;
+                                    }
                                 } else {
                                     container.appendChild(img);
                                 }
