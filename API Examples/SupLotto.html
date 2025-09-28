@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <!--
-  Sup!? Lotto Terminal v5.35 — A Galactic Bitcoin Adventure
+  Sup!? Lotto Terminal v5.36 — A Galactic Bitcoin Adventure
   =======================================================
   What a ride! Together, we forged a decentralized lottery terminal that dances on the Bitcoin mainnet and testnet, powered by the raw energy of Sup!? (https://github.com/embiimob/SUP) and the P2FK.IO API. Late nights, copy-pasting messages into Sup!?, and watching blockchain data spark to life—it’s been a cyberpunk saga of creativity and grit. From sculpting a retro-futuristic UI to syncing lotteries with #MatrixCore, we’ve built a terminal that’s as bold as a neon-lit asteroid field. Here’s to the countless code sprints, blockchain brainstorms, and that sweet moment when the cards lit up with winners. 🚀🎰
 
@@ -11,11 +11,11 @@
 
   Technical Analysis
   =================
-  Sup!? Lotto Terminal v5.35 is a single-page HTML5 web app that brings decentralized lotteries to life by processing Bitcoin blockchain messages via Sup!?. Key highlights:
+  Sup!? Lotto Terminal v5.36 is a single-page HTML5 web app that brings decentralized lotteries to life by processing Bitcoin blockchain messages via Sup!?. Key highlights:
 
   - **Architecture**: A lean, modular JavaScript core with a PromiseQueue for concurrent API and IPFS requests, ensuring a snappy UI. Leverages moment.js for precise time handling in MDT, syncing with Bitcoin’s BlockDate.
   - **Data Flow**: Pulls messages from p2fk.io, parsing JSON and IPFS links (e.g., QmUYhka... for Star Trek GIFs) via extractJsonAndTag. Messages copied into Sup!? fuel lotteries (#LottoCreate, #LottoTicket), stored in memory-only Map caches for speed and CORS compliance.
-  - **UI/UX**: Cyberpunk vibes with Orbitron font and colors (#00b33c, #80cc99, #ccac00). Compact Lotto Cards (200px) and ticket images (300px) use a grid layout, with async IPFS loading and placeholders to keep things smooth. Messages (e.g., "THIS IS A MESSAGELSDKJLKS...") shine instantly, even if images lag.
+  - **UI/UX**: Cyberpunk vibes with Orbitron font, Matrix-inspired neon green (#00FF00), darker green (#008800), and cyan (#00FFFF) colors. Compact Lotto Cards (300px height) use a grid layout, with async IPFS loading and placeholders to keep things smooth. Messages shine below card details.
   - **Core Features**:
     - Parses Bitcoin mainnet/testnet messages pasted into Sup!?, extracting keywords, JSON, and IPFS for lotteries and tickets.
     - Displays lotteries with status (OPEN/CLOSED/SPOILED), winner flair (🏆), and dynamic time-left based on BlockDate + duration.
@@ -28,47 +28,89 @@
   This terminal is a love letter to blockchain creativity, blending Bitcoin’s raw power with Sup!?‘s message-pasting magic. Built with ❤️ by a coder and Grok 3 (xAI).
 
   Created: September 25, 2025
+  Updated: September 27, 2025
 -->
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Sup Lotto Terminal v5.35 — Production</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sup!? Lotto Terminal v5.36 — Production</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        /* Unchanged CSS from previous version with updates for issues */
         html, body {
             height: 100%;
             margin: 0;
             padding: 0;
             background: #000;
-            font-family: 'Orbitron', sans-serif;
-            color: #00b33c;
+            font-family: 'Orbitron', 'Courier New', monospace;
+            color: #00FF00;
         }
 
         body {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+            display: block;
         }
 
         .terminal {
-            width: 920px;
-            max-width: 94vw;
+            width: 100vw;
+            height: 100vh;
             background: #111111;
-            border: 2px solid #00b33c;
-            border-radius: 12px;
-            padding: 18px;
+            border-radius: 0;
+            padding: 0 10px 10px 10px; /* Remove top padding */
             box-sizing: border-box;
-            box-shadow: 0 6px 30px rgba(0,179,60,0.06);
+            box-shadow: none;
+            display: flex;
+            flex-direction: column;
+            overflow: auto;
+            position: relative;
         }
+
+            /* Matrix-style digital rain background */
+            .terminal::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.9)), url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg"><text x="0" y="15" font-family="monospace" font-size="12" fill="#00FF00" opacity="0.3">1010101010101010101010101010101010101010101010101010101010101010</text></svg>') repeat;
+                animation: digitalRain 10s linear infinite;
+                z-index: -1;
+            }
+
+        @keyframes digitalRain {
+            0% {
+                background-position: 0 0;
+            }
+
+            100% {
+                background-position: 0 1000px;
+            }
+        }
+
+        .fixed-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 0; /* Ensure no top margin */
+        }
+
+        .scrollable-section {
+            flex: 1;
+            overflow-y: auto;
+            scrollbar-width: none; /* Hide scrollbar in Firefox */
+            -ms-overflow-style: none; /* Hide scrollbar in IE/Edge */
+        }
+
+            .scrollable-section::-webkit-scrollbar {
+                display: none; /* Hide scrollbar in Chrome, Safari, etc. */
+            }
 
         .header {
             text-align: center;
-            font-size: 20px;
+            font-size: 24px; /* Larger for emphasis */
             font-weight: 900;
-            margin-bottom: 14px;
-            color: #00b33c;
+            margin: 0 0 14px 0; /* Remove top margin, keep bottom */
+            color: #00FF00;
+            text-shadow: 0 0 8px rgba(0, 255, 0, 0.8), 0 0 16px rgba(0, 255, 0, 0.4); /* Neon glow */
         }
 
         .status-thread {
@@ -76,13 +118,19 @@
             max-height: 100px;
             overflow-y: auto;
             margin-bottom: 12px;
-            color: #80cc99;
+            color: #00FFFF; /* Cyan for secondary elements */
             font-size: 12px;
             opacity: 0.85;
-            border: 1px solid rgba(0,179,60,0.2);
+            border: 1px solid rgba(0, 255, 0, 0.2);
             border-radius: 6px;
             padding: 8px;
+            scrollbar-width: none; /* Hide scrollbar in Firefox */
+            -ms-overflow-style: none; /* Hide scrollbar in IE/Edge */
         }
+
+            .status-thread::-webkit-scrollbar {
+                display: none; /* Hide scrollbar in Chrome, Safari, etc. */
+            }
 
             .status-thread .event {
                 opacity: 1;
@@ -117,12 +165,12 @@
         }
 
             .search-section input, .search-section select, .search-section button {
-                background: #1a1a1a;
-                color: #00b33c;
-                border: 1px solid #00b33c;
+                background: #008800; /* Darker green */
+                color: #00FF00;
+                border: 1px solid #00FF00;
                 padding: 6px 8px;
                 border-radius: 6px;
-                font-family: 'Orbitron';
+                font-family: 'Orbitron', 'Courier New', monospace;
                 font-size: 13px;
             }
 
@@ -131,7 +179,7 @@
             }
 
                 .search-section button:hover {
-                    background: #00b33c;
+                    background: #00FFFF; /* Cyan on hover */
                     color: #000;
                 }
 
@@ -143,63 +191,85 @@
         }
 
         .lotto-card {
-            background: #1a1a1a;
-            border: 1px solid rgba(0,179,60,0.18);
+            background: #008800; /* Darker green */
+            border: 1px solid rgba(0, 255, 0, 0.18);
             padding: 10px;
             border-radius: 10px;
             cursor: pointer;
             transition: transform .12s ease, box-shadow .12s ease;
             font-size: 12px;
-            height: 200px;
+            height: 300px;
             display: flex;
             flex-direction: column;
             justify-content: flex-start;
             box-sizing: border-box;
             position: relative;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
         }
 
             .lotto-card:hover {
                 transform: translateY(-6px);
-                box-shadow: 0 8px 24px rgba(0,0,0,0.7);
+                box-shadow: 0 8px 24px rgba(0, 255, 0, 0.3);
             }
 
             .lotto-card.open {
-                border: 2px solid #00b33c;
-                background: #222222;
+                border: 2px solid #00FF00;
+                background-color: rgba(0, 136, 0, 0.8);
                 transform: scale(1.05);
             }
 
             .lotto-card.closed {
-                border: 1px solid rgba(255,255,255,0.2);
-                background: #222222;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                background-color: rgba(0, 136, 0, 0.8);
                 opacity: 0.85;
             }
 
             .lotto-card.winner {
                 animation: winnerGlow 1.5s ease-in-out infinite;
                 border: 2px solid #ccac00;
-                background: #2a2a00;
+                background-color: rgba(42, 42, 0, 0.8);
             }
 
         @keyframes winnerGlow {
             0% {
-                box-shadow: 0 0 10px #ccac00, 0 0 20px rgba(204,172,0,0.5);
+                box-shadow: 0 0 10px #ccac00, 0 0 20px rgba(204, 172, 0, 0.5);
             }
 
             50% {
-                box-shadow: 0 0 20px #ccac00, 0 0 30px rgba(204,172,0,0.8);
+                box-shadow: 0 0 20px #ccac00, 0 0 30px rgba(204, 172, 0, 0.8);
             }
 
             100% {
-                box-shadow: 0 0 10px #ccac00, 0 0 20px rgba(204,172,0,0.5);
+                box-shadow: 0 0 10px #ccac00, 0 0 20px rgba(204, 172, 0, 0.5);
             }
         }
 
         .lotto-card .card-top {
             display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            z-index: 2;
+            margin-bottom: 8px;
+        }
+
+        .lotto-card .keyword {
+            font-size: 16px;
+            font-weight: 900;
+            color: #00FF00;
+            word-wrap: break-word;
+            max-width: 100%;
+            line-height: 1.2;
+            margin-bottom: 8px;
+            text-shadow: 0 0 4px rgba(0, 255, 0, 0.5);
+        }
+
+        .lotto-card .type-status {
+            display: flex;
             align-items: center;
             gap: 8px;
-            z-index: 2;
+            max-width: 100%;
         }
 
         .lotto-card .card-badge {
@@ -207,7 +277,7 @@
             padding: 3px 6px;
             border-radius: 6px;
             background: #002b00;
-            color: #80cc99;
+            color: #00FFFF; /* Cyan for badges */
             flex-shrink: 0;
         }
 
@@ -216,81 +286,23 @@
             color: #fff;
             padding: 3px 6px;
             border-radius: 6px;
-            display: inline-block;
             font-size: 11px;
             flex-shrink: 0;
         }
 
-        .lotto-image-container {
-            position: relative;
-            width: 100%;
-            height: 50px;
-            margin-top: 8px;
-        }
-
-        .lotto-image {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: 8px;
-            background: linear-gradient(180deg, #0b0b0b, #191919);
-        }
-
-        .lotto-image-overlay {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(0, 0, 0, 0.7);
-            color: #b3ccbb;
-            font-size: 10px;
-            padding: 4px;
-            text-align: center;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .winner-highlight {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: rgba(204,172,0,0.8);
-            color: #000;
-            font-size: 10px;
-            font-weight: 700;
-            text-align: center;
-            padding: 4px;
-            border-radius: 8px 8px 0 0;
-        }
-
-            .winner-highlight::after {
-                content: '🏆';
-                position: absolute;
-                right: 4px;
-                top: 4px;
-                font-size: 14px;
-            }
-
-        .lotto-message {
-            font-size: 11px;
-            color: #b3ccbb;
-            margin-top: 6px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
         .lotto-meta {
-            margin-top: 8px;
-            line-height: 1.15;
-            color: #80cc99;
-            flex-grow: 1;
+            margin-bottom: 8px;
+            line-height: 1.4;
+            color: #00FFFF;
+            z-index: 2;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 10px;
         }
 
             .lotto-meta a {
-                color: #80cc99;
+                color: #00FFFF;
                 text-decoration: none;
             }
 
@@ -299,11 +311,35 @@
                 font-weight: 700;
             }
 
+            .lotto-meta .date {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 100%;
+            }
+
+        .lotto-message {
+            font-size: 11px; /* Revert to original font size */
+            color: #b3ccbb;
+            margin-top: 6px;
+            max-height: 4.5em; /* Allow ~3 lines (line-height: 1.5 × 3) */
+            line-height: 1.5; /* Consistent line height */
+            overflow: hidden; /* Hide overflow beyond 3 lines */
+            text-overflow: ellipsis; /* Ellipsis for overflow */
+            display: block; /* Allow text wrapping */
+            white-space: normal; /* Explicitly allow wrapping */
+            z-index: 2;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 4px; /* Original padding */
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
         .lotto-card button {
             position: absolute;
-            top: 135px; /* Adjusted to sit over image */
+            bottom: 10px;
             right: 10px;
-            background: #00b33c;
+            background: #00FF00;
             color: #000;
             border: none;
             padding: 6px 8px;
@@ -313,11 +349,16 @@
             z-index: 3;
         }
 
+            .lotto-card button:hover {
+                background: #00FFFF;
+                color: #000;
+            }
+
         .modal-overlay {
             display: none;
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.78);
+            background: rgba(0, 0, 0, 0.78);
             z-index: 1200;
             align-items: center;
             justify-content: center;
@@ -326,7 +367,7 @@
 
         .modal {
             background: #111111;
-            border: 2px solid #00b33c;
+            border: 2px solid #00FF00;
             max-width: 760px;
             width: 100%;
             max-height: 84vh;
@@ -338,21 +379,23 @@
 
         .modal-header {
             padding: 12px 16px;
-            border-bottom: 1px solid rgba(0,179,60,0.08);
+            border-bottom: 1px solid rgba(0, 255, 0, 0.08);
             font-weight: 800;
+            color: #00FF00;
         }
 
         .modal-body {
             padding: 12px 16px;
             overflow: auto;
             flex: 1;
+            color: #00FFFF;
         }
 
             .modal-body label {
                 display: block;
                 margin-top: 8px;
                 font-size: 12px;
-                color: #80cc99;
+                color: #00FFFF;
             }
 
         .ticket-thread {
@@ -363,12 +406,12 @@
         }
 
         .ticket-entry {
-            background: #0b0b0b;
-            border: 1px solid rgba(0,179,60,0.08);
+            background: #008800;
+            border: 1px solid rgba(0, 255, 0, 0.08);
             padding: 15px;
             border-radius: 10px;
             font-size: 13px;
-            color: #b3ccbb;
+            color: #00FFFF;
             position: relative;
         }
 
@@ -381,7 +424,7 @@
             }
 
             .ticket-entry.winner {
-                border: 1px solid #ccac00; /* Thinner border for clarity */
+                border: 1px solid #ccac00;
                 background: #2a2a00;
                 position: relative;
             }
@@ -392,31 +435,36 @@
                     top: 0;
                     left: 0;
                     right: 0;
-                    background: rgba(204,172,0,0.7); /* Semi-transparent for readability */
+                    background: rgba(204, 172, 0, 0.7);
                     color: #000;
                     font-size: 10px;
                     font-weight: 700;
                     text-align: center;
-                    padding: 10px; /* Increased padding */
+                    padding: 10px;
                     border-radius: 8px 8px 0 0;
                     z-index: 1;
                 }
 
                 .ticket-entry.winner > * {
                     position: relative;
-                    z-index: 2; /* Ensure content is above the overlay */
+                    z-index: 2;
                 }
 
         .modal input, .modal select, .modal textarea {
-            background: #1a1a1a;
-            color: #00b33c;
-            border: 1px solid #00b33c;
+            background: #008800;
+            color: #00FF00;
+            border: 1px solid #00FF00;
             padding: 8px;
             border-radius: 6px;
             width: 100%;
             box-sizing: border-box;
             margin-top: 4px;
         }
+
+            .modal input:focus, .modal select:focus, .modal textarea:focus {
+                outline: none;
+                box-shadow: 0 0 5px #00FFFF;
+            }
 
         .error-log {
             max-height: 80px;
@@ -426,45 +474,76 @@
             font-size: 12px;
             display: none;
         }
+        /* Placeholder styling for better visibility */
+        .search-section input::placeholder,
+        .modal input::placeholder,
+        .modal textarea::placeholder {
+            color: #FFFFFF; /* White for maximum contrast */
+            opacity: 1; /* Full opacity for readability */
+        }
 
-        .truncate-keyword {
-            max-width: 100px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+        /* Webkit-specific placeholder styling */
+        .search-section input::-webkit-input-placeholder,
+        .modal input::-webkit-input-placeholder,
+        .modal textarea::-webkit-input-placeholder {
+            color: #FFFFFF;
+            opacity: 1;
+        }
+
+        /* Mozilla-specific placeholder styling */
+        .search-section input::-moz-placeholder,
+        .modal input::-moz-placeholder,
+        .modal textarea::-moz-placeholder {
+            color: #FFFFFF;
+            opacity: 1;
+        }
+
+        /* Microsoft-specific placeholder styling */
+        .search-section input::-ms-input-placeholder,
+        .modal input::-ms-input-placeholder,
+        .modal textarea::-ms-input-placeholder {
+            color: #FFFFFF;
+            opacity: 1;
         }
     </style>
 </head>
 <body>
     <div class="terminal" id="terminal">
-        <div class="header">🚀 Sup!? LOTTO TERMINAL v5.35 🚀<br><small>Grid Matrix Jackpot — Production</small></div>
-        <div class="status-thread" id="statusThread"><div>Ready.</div></div>
-        <div class="network-section">
-            <label for="mainnet">Mainnet:</label>
-            <input type="checkbox" id="mainnet">
+        <div class="fixed-section">
+            <div class="network-section">
+
+            </div>
+            <div class="search-section">
+                <input id="keyword" placeholder="Keyword  ( e.g., ASTRO )" maxlength="20">
+                <select id="lottoType">
+                    <option value="">Any Type</option>
+                    <option value="pb">Powerball</option>
+                    <option value="mg">Mega</option>
+                    <option value="sc">Scratch</option>
+                </select>
+                <select id="statusFilter">
+                    <option value="">Any Status</option>
+                    <option value="OPEN">OPEN</option>
+                    <option value="CLOSED">CLOSED</option>
+                    <option value="SPOILED">SPOILED</option>
+                    <option value="PENDING">PENDING</option>
+                </select>
+                <select id="prizeFilter">
+                    <option value="">Any Prize</option>
+                </select>
+
+
+                <button id="scanBtn">🔍 SCAN</button>
+                <button id="createBtn">✨ CREATE</button>
+                <label for="mainnet">Mainnet:</label>
+                <input type="checkbox" id="mainnet">
+            </div>
         </div>
-        <div class="search-section">
-            <input id="keyword" placeholder="Keyword (e.g., ASTRO)" maxlength="20">
-            <select id="lottoType">
-                <option value="">Any Type</option>
-                <option value="pb">Powerball (PB)</option>
-                <option value="mg">Mega (MG)</option>
-                <option value="sc">Scratch (SC)</option>
-            </select>
-            <select id="statusFilter">
-                <option value="">Any Status</option>
-                <option value="OPEN">OPEN</option>
-                <option value="CLOSED">CLOSED</option>
-                <option value="SPOILED">SPOILED</option>
-                <option value="PENDING">PENDING</option>
-            </select>
-            <select id="prizeFilter">
-                <option value="">Any Prize</option>
-            </select>
-            <button id="scanBtn">🔍 SCAN</button>
-            <button id="createBtn">✨ CREATE</button>
+        <div class="scrollable-section">
+            <div class="header">🚀 Sup!? LOTTO TERMINAL v5.36 🚀</div>
+            <div class="status-thread" id="statusThread"><div>Ready.</div></div>
+            <div class="lotto-list" id="lottoList"></div>
         </div>
-        <div class="lotto-list" id="lottoList"></div>
         <div class="modal-overlay" id="createModalOverlay" aria-hidden="true">
             <div class="modal">
                 <div class="modal-header">✨ CREATE NEW LOTTO</div>
@@ -474,12 +553,12 @@
                     <label for="createLottoType">Lotto Type</label>
                     <select id="createLottoType">
                         <option value="">Select Type</option>
-                        <option value="pb">Powerball (PB)</option>
-                        <option value="mg">Mega (MG)</option>
-                        <option value="sc">Scratch (SC)</option>
+                        <option value="pb">Powerball</option>
+                        <option value="mg">Mega</option>
+                        <option value="sc">Scratch</option>
                     </select>
                     <label for="createPrizeModal">Prize</label>
-                    <input id="createPrizeModal" list="prizeOptions" placeholder="Prize (e.g., 100 TRX)">
+                    <input id="createPrizeModal" list="prizeOptions" placeholder="Prize (e.g., USD)">
                     <datalist id="prizeOptions"></datalist>
                     <label for="createQty">Quantity</label>
                     <input type="number" id="createQty" min="1" placeholder="Quantity" value="1">
@@ -546,7 +625,7 @@
         const API_TIMEOUT_MS = 15000;
         const TICKET_BUFFER_MINUTES = 22;
         const VALID_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-        const INITIAL_TICKET_RENDER_LIMIT = 50;
+        const INITIAL_TICKET_RENDER_LIMIT = 20;
         const MAX_CONCURRENT_REQUESTS = 2;
         const IMAGE_FETCH_DELAY_MS = 500;
         const IPFS_RETRY_ATTEMPTS = 3;
@@ -578,7 +657,7 @@
                 setTimeout(() => eventDiv.remove(), 1000);
             }, 5000);
         }
-        function logError(msg) { console.log(msg); } // Temporary for debugging images
+        function logError(msg) { console.log(msg); }
 
         /* ---------------------- Globals & caches ---------------------- */
         let isMainnet = false;
@@ -695,15 +774,21 @@
                 const data = await res.text();
                 masterAddress = data.replace(/^"|"$/g, '').trim();
                 if (!masterAddress || masterAddress.length < 34 || masterAddress.length > 36) throw new Error(`Invalid master address: ${masterAddress}`);
+                logStatus(`Master address fetched: ${masterAddress.substring(0, 8)}...`);
             } catch (e) {
                 masterAddress = null;
+                logStatus(`Failed to fetch master address: ${e.message}`, 'error');
             }
         }
 
         async function fetchMessages(skip = 0, qty = NORMAL_FETCH_QTY, isInitial = false) {
             if (!masterAddress) {
                 await fetchMasterAddress();
-                if (!masterAddress) return;
+                if (!masterAddress) {
+                    logStatus('No master address available, cannot fetch messages');
+                    await displayLottos(true); // Ensure UI clears if no data
+                    return;
+                }
             }
             try {
                 const searchState = {
@@ -724,6 +809,7 @@
                 url.searchParams.set('mainnet', String(isMainnet));
                 url.searchParams.set('skip', skip);
                 url.searchParams.set('qty', isInitial ? INIT_FETCH_QTY : qty);
+                logStatus(`Fetching messages for ${isMainnet ? 'mainnet' : 'testnet'} (skip=${skip}, qty=${qty})`);
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
                 const res = await fetch(url.toString(), { signal: controller.signal });
@@ -731,7 +817,10 @@
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const messages = await res.json();
                 if (!Array.isArray(messages)) throw new Error('Invalid response format');
+                logStatus(`Fetched ${messages.length} messages for ${isMainnet ? 'mainnet' : 'testnet'}`);
                 await analyzeMessages(messages, isInitial);
+                // Explicitly update UI even if no messages
+                await displayLottos(true);
                 $('keyword').value = searchState.keyword;
                 $('lottoType').value = searchState.lottoType;
                 $('statusFilter').value = searchState.statusFilter;
@@ -741,7 +830,10 @@
                 $('createPrizeModal').value = createState.createPrizeModal;
                 $('createQty').value = createState.createQty;
                 $('createDuration').value = createState.createDuration;
-            } catch (e) { logError(`fetchMessages error: ${e.message}`); }
+            } catch (e) {
+                logStatus(`fetchMessages error: ${e.message}`, 'error');
+                await displayLottos(true); // Ensure UI clears on error
+            }
         }
 
         /* ---------------------- Message parsing helpers ---------------------- */
@@ -820,7 +912,8 @@
         /* ---------------------- Analyze messages and update caches ---------------------- */
         async function analyzeMessages(messages, isInitial = false) {
             if (!messages || !messages.length) {
-                logError('analyzeMessages: No messages to process');
+                logStatus(`No messages to process for ${isMainnet ? 'mainnet' : 'testnet'}`);
+                await displayLottos(true); // Ensure UI updates even with no messages
                 return;
             }
             const parsedMessages = (await Promise.all(messages.filter(m => m && m.TransactionId).map(parseMessage))).filter(Boolean).sort((a, b) => a.block.diff(b.block));
@@ -1074,37 +1167,34 @@
                 card.className = `lotto-card ${session.status === 'OPEN' ? 'open' : 'closed'}${session.winner ? ' winner' : ''}`;
                 card.dataset.base = base;
                 card.dataset.txid = session.txid || '';
-                const statusBadge = session.status === 'SPOILED' ? `<span class="spoiled-badge">SPOILED</span>` : `<span class="card-badge">${session.status}</span>`;
-                let imgTag = '';
-                if (session.image && session.image.hash) {
-                    imgTag = `<div class="lotto-image-container">`;
-                    if (imageData && imageData.isImage) {
-                        imgTag += `<img src="${imageData.url}" class="lotto-image" alt="lotto image">`;
-                    }
-                    if (session.winner) {
-                        imgTag += `<div class="lotto-image-overlay">Winner: ${winnerDisplay} 🏆</div>`;
-                    } else if (session.message) {
-                        imgTag += `<div class="lotto-image-overlay">${session.message.length > 30 ? session.message.substring(0, 30) + '...' : session.message}</div>`;
-                    }
-                    imgTag += `</div>`;
-                } else if (session.message && !session.winner) {
-                    imgTag += `<div class="lotto-message">${session.message.length > 30 ? session.message.substring(0, 30) + '...' : session.message}</div>`;
+                if (imageData && imageData.isImage) {
+                    card.style.backgroundImage = `url(${imageData.url})`;
                 }
+                const statusBadge = session.status === 'SPOILED' ? `<span class="spoiled-badge">SPOILED</span>` : `<span class="card-badge">${session.status}</span>`;
+                const typeDisplay = session.type === 'pb' ? 'Powerball' : session.type === 'mg' ? 'Mega' : session.type === 'sc' ? 'Scratch' : 'Unknown';
                 let html = `
-              <div class="card-top">
-                <div style="flex:1"><strong class="truncate-keyword">#${base}</strong><div style="font-size:11px;color:#80cc99">${session.type || 'Unknown'} • ${session.prize || '—'}</div></div>
-                ${statusBadge}
-              </div>
-              <div class="lotto-meta">
-                Qty: ${session.qty} • SessionTickets: ${totalTickets} • AllTickets: ${allTickets}<br>
-                Open: ${session.start.format('YYYY-MM-DD HH:mm')}<br>
-                Close: ${session.end.format('YYYY-MM-DD HH:mm')}<br>
-                Tx: ${session.txid.substring(0, 8)}...<br>
-                Creator: <a href="#" class="${creatorClass}" data-addr="${session.creator}">${creatorDisplay}</a>
-                ${winnerDisplay ? `<br>Winner: <a href="#" data-addr="${session.winner}">${winnerDisplay} 🏆</a>` : ''}
-              </div>
+                <div class="card-top">
+                    <div class="keyword">#${base}</div>
+                    <div class="type-status">
+                        <span>${typeDisplay}</span>
+                        ${statusBadge}
+                    </div>
+                </div>
+                <div class="lotto-meta">
+                    <div>Prize: ${session.prize || '—'}</div>
+                    <div>Qty: ${session.qty}</div>
+                    <div>Tickets: ${totalTickets}</div>
+                    <div>All Tickets: ${allTickets}</div>
+                    <div class="date">Open: ${session.start.format('YYYY-MM-DD HH:mm')}</div>
+                    <div class="date">Close: ${session.end.format('YYYY-MM-DD HH:mm')}</div>
+                    <div>Tx: ${session.txid.substring(0, 8)}...</div>
+                    <div>Creator: <a href="#" class="${creatorClass}" data-addr="${session.creator}">${creatorDisplay}</a></div>
+                    ${winnerDisplay ? `<div>Winner: <a href="#" data-addr="${session.winner}">${winnerDisplay} 🏆</a></div>` : ''}
+                </div>
             `;
-                html += imgTag;
+                if (session.message) {
+                    html += `<div class="lotto-message">${session.message.length > 270 ? session.message.substring(0, 270) + '...' : session.message}</div>`;
+                }
                 if (session.status === 'OPEN') html += `<button data-action="buy" data-base="${base}">🚀 BUY</button>`;
                 card.innerHTML = html;
                 if (session.image && session.image.hash && (!imageData || !imageData.isImage)) {
@@ -1113,25 +1203,7 @@
                         if (imgData && imgData.isImage) {
                             logError(`displayLottos: IPFS resolved for ${session.image.hash}, updating card`);
                             cache.imageCache.set(session.image.hash, imgData);
-                            const existingImg = card.querySelector('.lotto-image');
-                            if (!existingImg) {
-                                const container = card.querySelector('.lotto-image-container') || card;
-                                const img = document.createElement('img');
-                                img.src = imgData.url;
-                                img.className = 'lotto-image';
-                                img.alt = 'lotto image';
-                                if (container.className === 'lotto-image-container') {
-                                    if (session.winner) {
-                                        container.innerHTML = `<img src="${imgData.url}" class="lotto-image" alt="lotto image"><div class="lotto-image-overlay">Winner: ${winnerDisplay} 🏆</div>`;
-                                    } else if (session.message) {
-                                        container.innerHTML = `<img src="${imgData.url}" class="lotto-image" alt="lotto image"><div class="lotto-image-overlay">${session.message.length > 30 ? session.message.substring(0, 30) + '...' : session.message}</div>`;
-                                    } else {
-                                        container.innerHTML = `<img src="${imgData.url}" class="lotto-image" alt="lotto image">`;
-                                    }
-                                } else {
-                                    container.appendChild(img);
-                                }
-                            }
+                            card.style.backgroundImage = `url(${imgData.url})`;
                         }
                     }).catch(e => logError(`displayLottos: IPFS fetch failed for ${session.image.hash}: ${e.message}`));
                 }
@@ -1218,7 +1290,7 @@
                     let inner = `<div><strong>Player:</strong> <a href="#" class="${playerClass}" data-addr="${ticket.player}">${playerDisplay}</a></div>`;
                     inner += `<div><strong>Time:</strong> ${ticket.block ? ticket.block.format('YYYY-MM-DD HH:mm') : '—'}</div>`;
                     inner += `<div><strong>TxID:</strong> ${ticket.txid ? ticket.txid.substring(0, 8) + '...' : '—'}</div>`;
-                    if (ticket.message) inner += `<div style="margin-top:6px;color:#b3ccbb">${ticket.message.length > 250 ? ticket.message.substring(0, 250) + '...' : ticket.message}</div>`;
+                    if (ticket.message) inner += `<div style="margin-top: 6px;color:#00FFFF">${ticket.message.length > 250 ? ticket.message.substring(0, 250) + '...' : ticket.message}</div>`;
                     entry.innerHTML = inner;
                     if (ticket.image && ticket.image.hash) {
                         const cached = cache.imageCache.get(ticket.image.hash);
@@ -1355,19 +1427,54 @@
             Array.from(cache.types).sort().forEach(type => {
                 const o1 = document.createElement('option');
                 o1.value = type;
-                o1.textContent = type.toUpperCase();
+                o1.textContent = type === 'pb' ? 'Powerball' : type === 'mg' ? 'Mega' : type === 'sc' ? 'Scratch' : type.toUpperCase();
                 lottoType.appendChild(o1);
                 const o2 = document.createElement('option');
                 o2.value = type;
-                o2.textContent = type.toUpperCase();
+                o2.textContent = type === 'pb' ? 'Powerball' : type === 'mg' ? 'Mega' : type === 'sc' ? 'Scratch' : type.toUpperCase();
                 createLottoType.appendChild(o2);
             });
             lottoType.value = selectedLottoType;
             createLottoType.value = selectedCreateLottoType;
         }
 
+        /* ---------------------- Clear Cache Function ---------------------- */
+        function clearCache() {
+            cache.sessions.clear();
+            cache.tickets.clear();
+            cache.prizes.clear();
+            cache.types.clear();
+            cache.urns.clear();
+            cache.imageCache.clear();
+            processedTxIds.clear();
+            masterAddress = null;
+            cache.types.add('pb');
+            cache.types.add('mg');
+            cache.types.add('sc');
+            logStatus('Cache cleared');
+            // Force UI refresh to clear cards immediately
+            const container = $('lottoList');
+            if (container) container.innerHTML = '';
+        }
+
         /* ---------------------- Initialize (boot + poll) ---------------------- */
         function init() {
+            // Add event listener for mainnet checkbox
+            const mainnetCheckbox = $('mainnet');
+            mainnetCheckbox.addEventListener('change', async () => {
+                isMainnet = mainnetCheckbox.checked;
+                logStatus(`Mainnet ${isMainnet ? 'enabled' : 'disabled'}`);
+                // Clear cache and refresh UI
+                clearCache();
+                // Wait for fetch to complete and ensure UI updates
+                await fetchMasterAddress();
+                if (masterAddress) {
+                    await fetchMessages(0, INIT_FETCH_QTY, true);
+                } else {
+                    await displayLottos(true); // Clear UI if no master address
+                }
+            });
+
             $('scanBtn').addEventListener('click', () => displayLottos(false));
             $('createBtn').addEventListener('click', showCreateModal);
             $('createCancelBtn').addEventListener('click', closeCreateModal);
@@ -1382,7 +1489,6 @@
             });
             setInterval(() => fetchMessages(), POLL_MS);
         }
-        init();
-    </script>
+        init();</script>
 </body>
 </html>
