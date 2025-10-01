@@ -115,9 +115,9 @@ window.addEventListener('DOMContentLoaded', () => {
     const CHUNK_HEIGHT = 256;
     const WORLD_SIZE = 999999;
     const RENDER_DISTANCE = 3; // Loads 5x5 chunk grid
-    const POLL_INTERVAL = 30000; // 30s
-    const IPFS_FETCH_TIMEOUT_MS = 8000;
-    const CLAIM_DURATION = 30 * 24 * 60 * 60 * 1000;
+    const POLL_INTERVAL = 15000; // 15s
+    const IPFS_FETCH_TIMEOUT_MS = 10000;
+    const CLAIM_DURATION = 30 * 24 * 60 * 60 * 1000; // does this even work!?
     const EXPIRY_DURATION = 365 * 24 * 60 * 60 * 1000;
     const BLOCK_TYPES = {
         0: { name: 'air', color: 0x000000, visible: false },
@@ -569,7 +569,6 @@ function updateStatusDisplay() {
     }
 
 function openSaveModal() {
-    console.log(`[openSaveModal] Opening save modal for world ${worldName}, user ${userAddress}`);
     document.getElementById('modal-master').value = MASTER_KEYWORD;
     document.getElementById('modal-active').value = worldName;
     const addresses = [], keywords = [];
@@ -591,25 +590,19 @@ function openSaveModal() {
     });
     const addressString = addresses.filter(a => a).join(',');
     const keywordString = chunkKeywords.join(', ');
-    console.log(`[openSaveModal] Generated addresses: ${addressString}`);
-    console.log(`[openSaveModal] Generated keywords: ${keywordString || 'No modified chunks'}`);
     const saveFile = buildSaveFile();
-    console.log(`[openSaveModal] Generated save file:`, JSON.parse(saveFile));
     document.getElementById('modal-addresses').value = addressString;
     document.getElementById('modal-keywords').value = keywordString || 'No modified chunks';
     document.getElementById('modal-file-preview').textContent = saveFile;
     document.getElementById('modal-copy-keywords').onclick = async () => {
         await navigator.clipboard.writeText(keywordString || 'No modified chunks');
         setStatus('Chunk keywords copied to clipboard.');
-        console.log(`[openSaveModal] Copied keywords to clipboard: ${keywordString || 'No modified chunks'}`);
     };
     document.getElementById('modal-copy-addresses').onclick = async () => {
         await navigator.clipboard.writeText(addressString);
         setStatus('Addresses copied for Sup!?');
-        console.log(`[openSaveModal] Copied addresses to clipboard: ${addressString}`);
     };
     document.getElementById('modal-download-file').onclick = () => {
-        console.log(`[openSaveModal] Initiating download of save file for ${worldName}`);
         const blob = new Blob([saveFile], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -620,66 +613,14 @@ function openSaveModal() {
         a.remove();
         URL.revokeObjectURL(url);
         setStatus('Save file downloaded.');
-        console.log(`[openSaveModal] Save file downloaded: mcworld_${worldName}_save.json`);
     };
     document.getElementById('modal-close').onclick = () => {
         document.getElementById('save-modal').style.display = 'none';
-        console.log(`[openSaveModal] Save modal closed`);
     };
     document.getElementById('save-modal').style.display = 'block';
 }
 
 
-    function openSaveModalOriginal() {
-        document.getElementById('modal-master').value = MASTER_KEYWORD;
-        document.getElementById('modal-active').value = worldName;
-        const addresses = [], keywords = [];
-        addresses.push(API_CACHE.get(`/GetPublicAddressByKeyword/${MASTER_KEYWORD}`)?.address || '');
-        keywords.push(`#${MASTER_KEYWORD}`);
-        addresses.push(API_CACHE.get(`/GetPublicAddressByKeyword/${worldName}`)?.address || '');
-        keywords.push(`#${worldName}`);
-        if (modifiedBlocks[lastSavedChunkKey] || lastSavedChunkKey !== getChunkKey(player.position)) {
-            addresses.push(API_CACHE.get(`/GetPublicAddressByKeyword/MCUserJoin@${worldName}`)?.address || '');
-            keywords.push(`#MCUserJoin@${worldName}`);
-        }
-        const chunkKeywords = [];
-        Array.from(modifiedChunks).sort().forEach(chunkKey => {
-            const [cx, cz] = chunkKey.split(',').map(Number);
-            const chunkKW = `${worldName}${cx.toString().padStart(6, '0')}${cz.toString().padStart(6, '0')}`;
-            chunkKeywords.push(`#${chunkKW}`);
-            addresses.push(API_CACHE.get(`/GetPublicAddressByKeyword/${chunkKW}`)?.address || '');
-            keywords.push(`#${chunkKW}`);
-        });
-        const addressString = addresses.filter(a => a).join(',');
-        const keywordString = chunkKeywords.join(', ');
-        document.getElementById('modal-addresses').value = addressString;
-        document.getElementById('modal-keywords').value = keywordString || 'No modified chunks';
-        document.getElementById('modal-file-preview').textContent = buildSaveFile();
-        document.getElementById('modal-copy-keywords').onclick = async () => {
-            await navigator.clipboard.writeText(keywordString || 'No modified chunks');
-            setStatus('Chunk keywords copied to clipboard.');
-        };
-        document.getElementById('modal-copy-addresses').onclick = async () => {
-            await navigator.clipboard.writeText(addressString);
-            setStatus('Addresses copied for Sup!?');
-        };
-        document.getElementById('modal-download-file').onclick = () => {
-            const blob = new Blob([buildSaveFile()], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `mcworld_${worldName}_save.json`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(url);
-            setStatus('Save file downloaded.');
-        };
-        document.getElementById('modal-close').onclick = () => {
-            document.getElementById('save-modal').style.display = 'none';
-        };
-        document.getElementById('save-modal').style.display = 'block';
-    }
 
    function generateChunk(cx, cz, immediate = false) {
     // Validate inputs
@@ -768,14 +709,12 @@ async function fetchIPFSFile(ipfsHash) {
     }
 
     if (IPFS_CACHE.has(ipfsHash)) {
-        console.log(`[fetchIPFSFile] Cache hit for IPFS hash ${ipfsHash}`);
         return IPFS_CACHE.get(ipfsHash);
     }
     
     const gateways = ['https://ipfs.io/ipfs/', 'https://cloudflare-ipfs.com/ipfs/'];
     for (const gateway of gateways) {
         const url = `${gateway}${ipfsHash}`;
-        console.log(`[fetchIPFSFile] Attempting to fetch IPFS file from ${url}`);
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => {
@@ -786,7 +725,6 @@ async function fetchIPFSFile(ipfsHash) {
             clearTimeout(timeoutId);
             if (response.ok) {
                 const data = await response.json();
-                console.log(`[fetchIPFSFile] Successfully fetched data from ${url}:`, data);
                 if (!data || typeof data !== 'object') {
                     console.warn(`[fetchIPFSFile] Invalid JSON structure for ${ipfsHash}:`, data);
                     return null;
@@ -811,65 +749,21 @@ async function fetchIPFSFile(ipfsHash) {
 }
 
 
-async function fetchIPFSFileOriginal(ipfsHash) {
-    if (!ipfsHash) return null;
-    
-    // Validate IPFS hash (CIDv0 starts with 'Qm' and is typically 46 chars, CIDv1 varies)
-    const cidRegex = /^[A-Za-z0-9]{46}$|^[A-Za-z0-9]{59}$|^[a-z0-9]+$/;
-    if (!cidRegex.test(ipfsHash)) {
-        console.warn(`Invalid IPFS hash: ${ipfsHash}`);
-        setStatus(`Invalid IPFS hash: ${ipfsHash}`);
-        return null;
-    }
-
-    if (IPFS_CACHE.has(ipfsHash)) return IPFS_CACHE.get(ipfsHash);
-    
-    const gateways = ['https://ipfs.io/ipfs/', 'https://cloudflare-ipfs.com/ipfs/'];
-    for (const gateway of gateways) {
-        const url = `${gateway}${ipfsHash}`;
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => {
-                controller.abort();
-                console.warn(`IPFS fetch timeout for ${url} after ${IPFS_FETCH_TIMEOUT_MS}ms`);
-            }, IPFS_FETCH_TIMEOUT_MS);
-            const response = await fetch(url, { signal: controller.signal });
-            clearTimeout(timeoutId);
-            if (response.ok) {
-                const data = await response.json();
-                IPFS_CACHE.set(ipfsHash, data);
-                return data;
-            } else {
-                console.warn(`IPFS fetch failed for ${url}: HTTP ${response.status} ${response.statusText}`);
-            }
-        } catch (err) {
-            console.warn(`IPFS fetch error for ${url}:`, err);
-            setStatus(`Failed to fetch IPFS file ${ipfsHash}: ${err.message}`);
-        }
-    }
-    console.warn(`All IPFS gateways failed for hash ${ipfsHash}`);
-    return null;
-}
 
 async function applySaveFile(data, fromAddress, blockDate) {
     if (!data || !data.chunks) {
         console.warn(`[applySaveFile] Invalid or missing save data from ${fromAddress}:`, data);
         return;
     }
-    console.log(`[applySaveFile] Processing save file from ${fromAddress} at ${blockDate}:`, data);
     const now = Date.now();
     for (const [chunkKey, blocks] of Object.entries(data.chunks)) {
-        console.log(`[applySaveFile] Processing chunk ${chunkKey} with ${blocks.length} blocks`);
         const [localCx, localCz] = chunkKey.split(',').map(Number);
         if (!chunks[chunkKey]) {
-            console.log(`[applySaveFile] Generating chunk ${chunkKey} for update`);
             generateChunk(localCx, localCz);
         }
         const claim = chunkClaims[chunkKey] || { ownerAddress: '', lastModified: 0, claimedAt: 0 };
-        console.log(`[applySaveFile] Chunk ${chunkKey} claim status:`, claim);
         if (!claim.ownerAddress || claim.ownerAddress === fromAddress || now - claim.lastModified >= EXPIRY_DURATION) {
             blocks.forEach(([localX, y, localZ, blockId], index) => {
-                console.log(`[applySaveFile] Updating block ${index + 1}/${blocks.length} in chunk ${chunkKey}: [${localX}, ${y}, ${localZ}] to blockId ${blockId}`);
                 const worldX = localCx * CHUNK_SIZE + localX;
                 const worldZ = localCz * CHUNK_SIZE + localZ;
                 updateBlock(localCx, localCz, worldX, y, worldZ, blockId, fromAddress, false);
@@ -879,43 +773,17 @@ async function applySaveFile(data, fromAddress, blockDate) {
                 lastModified: new Date(blockDate).getTime(), 
                 claimedAt: claim.claimedAt || new Date(blockDate).getTime() 
             };
-            console.log(`[applySaveFile] Updated claim for chunk ${chunkKey}:`, chunkClaims[chunkKey]);
         } else {
-            console.log(`[applySaveFile] Skipped chunk ${chunkKey}: Owned by ${claim.ownerAddress}, last modified ${new Date(claim.lastModified).toISOString()}`);
         }
     }
     if (data.profile && fromAddress === userAddress) {
-        console.log(`[applySaveFile] Applying user profile for ${userAddress}:`, data.profile);
         lastSavedPosition = new THREE.Vector3(...data.profile.position);
         Object.assign(inventory, data.profile.inventory || {});
-        console.log(`[applySaveFile] Updated position to [${lastSavedPosition.x}, ${lastSavedPosition.y}, ${lastSavedPosition.z}], inventory:`, inventory);
     } else {
-        console.log(`[applySaveFile] No profile data or not user's own save for ${fromAddress}`);
     }
 }
 
 
-    async function applySaveFileOrignal(data, fromAddress, blockDate) {
-        if (!data || !data.chunks) return;
-        const now = Date.now();
-        for (const [chunkKey, blocks] of Object.entries(data.chunks)) {
-            const [localCx, localCz] = chunkKey.split(',').map(Number);
-            if (!chunks[chunkKey]) generateChunk(localCx, localCz);
-            const claim = chunkClaims[chunkKey] || { ownerAddress: '', lastModified: 0, claimedAt: 0 };
-            if (!claim.ownerAddress || claim.ownerAddress === fromAddress || now - claim.lastModified >= EXPIRY_DURATION) {
-                blocks.forEach(([localX, y, localZ, blockId]) => {
-                    const worldX = localCx * CHUNK_SIZE + localX;
-                    const worldZ = localCz * CHUNK_SIZE + localZ;
-                    updateBlock(localCx, localCz, worldX, y, worldZ, blockId, fromAddress, false);
-                });
-                chunkClaims[chunkKey] = { ownerAddress: fromAddress, lastModified: new Date(blockDate).getTime(), claimedAt: claim.claimedAt || new Date(blockDate).getTime() };
-            }
-        }
-        if (data.profile && fromAddress === userAddress) {
-            lastSavedPosition = new THREE.Vector3(...data.profile.position);
-            Object.assign(inventory, data.profile.inventory || {});
-        }
-    }
 
    async function apiCall(endpoint, params = {}, retries = 3) {
     const pathParams = params.path || {};
@@ -1110,7 +978,6 @@ async function applySaveFile(data, fromAddress, blockDate) {
         const wz = ((z % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
         const y = getTerrainHeight(noise, wx, wz) + 1;
         chunkClaims[chunkKey] = { ownerAddress: userAddress, lastModified: Date.now(), claimedAt: Date.now() };
-        console.log(`Assigned fallback deterministic home chunk ${chunkKey} for user ${userAddress} at position [${x}, ${y}, ${z}]`);
         return { chunkKey, position: [x, y, z] };
     } catch (err) {
         console.error(`Error in getPlayerHomeChunk for ${worldName}:`, err);
@@ -1129,7 +996,6 @@ async function applySaveFile(data, fromAddress, blockDate) {
         const noiseFallback = new window.SimplexNoise(fallbackHash.toString());
         const y = getTerrainHeight(noiseFallback, wx, wz) + 1;
         chunkClaims[chunkKey] = { ownerAddress: userAddress, lastModified: Date.now(), claimedAt: Date.now() };
-        console.log(`Assigned error fallback home chunk ${chunkKey} for user ${userAddress} at position [${x}, ${y}, ${z}]`);
         return { chunkKey, position: [x, y, z] };
     }
 }
@@ -1538,7 +1404,6 @@ async function pollChunks() {
     if (isPromptOpen) return;
     pollInterval = setInterval(async () => {
         if (isPromptOpen) return;
-        console.log(`[pollChunks] Starting poll for world ${worldName}, user ${userAddress}`);
         const cx = Math.floor((player.position.x + WORLD_SIZE) % WORLD_SIZE / CHUNK_SIZE);
         const cz = Math.floor((player.position.z + WORLD_SIZE) % WORLD_SIZE / CHUNK_SIZE);
         const chunkMessages = [];
@@ -1548,12 +1413,9 @@ async function pollChunks() {
                 const chunkZ = cz + dz;
                 const chunkKey = `${chunkX},${chunkZ}`;
                 const chunkKW = `${worldName}${chunkX.toString().padStart(6, '0')}${chunkZ.toString().padStart(6, '0')}`;
-                console.log(`[pollChunks] Checking chunk ${chunkKey} with keyword #${chunkKW}`);
                 const addressRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: chunkKW } });
                 if (addressRes?.address) {
-                    console.log(`[pollChunks] Found address ${addressRes.address} for #${chunkKW}`);
                     const messages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: addressRes.address }, query: { skip: 0, qty: 5000 } });
-                    console.log(`[pollChunks] Retrieved ${messages?.length || 0} messages for chunk ${chunkKey}`);
                     for (const msg of messages || []) {
                         console.log(`[pollChunks] Processing message for chunk ${chunkKey}:`, {
                             FromAddress: msg.FromAddress,
@@ -1570,13 +1432,10 @@ async function pollChunks() {
                                 console.warn(`[pollChunks] Invalid CID in message for chunk ${chunkKey}: ${cid}`);
                                 continue;
                             }
-                            console.log(`[pollChunks] Found valid CID ${cid} for chunk ${chunkKey} from ${msg.FromAddress} at ${msg.BlockDate}`);
                             try {
                                 const data = await fetchIPFSFile(cid);
                                 if (data) {
-                                    console.log(`[pollChunks] Successfully fetched IPFS data for CID ${cid}:`, data);
                                     await applySaveFile(data, msg.FromAddress, msg.BlockDate);
-                                    console.log(`[pollChunks] Applied save file for chunk ${chunkKey} from CID ${cid}`);
                                 } else {
                                     console.warn(`[pollChunks] No valid data fetched for IPFS CID ${cid} in chunk ${chunkKey}`);
                                 }
@@ -1584,20 +1443,15 @@ async function pollChunks() {
                                 console.warn(`[pollChunks] Failed to process IPFS file ${cid} for chunk ${chunkKey}:`, err);
                             }
                         } else {
-                            console.log(`[pollChunks] No IPFS CID found in message for chunk ${chunkKey}`);
                         }
                     }
                 } else {
-                    console.log(`[pollChunks] No address found for #${chunkKW}`);
                 }
             }
         }
-        console.log(`[pollChunks] Checking user join messages for #${joinKeyword}`);
         const addressRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: joinKeyword } });
         if (addressRes?.address) {
-            console.log(`[pollChunks] Found address ${addressRes.address} for #${joinKeyword}`);
             const messages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: addressRes.address }, query: { skip: 0, qty: 5000 } });
-            console.log(`[pollChunks] Retrieved ${messages?.length || 0} user join messages for ${userAddress}`);
             for (const msg of messages || []) {
                 if (msg.FromAddress === userAddress) {
                     console.log(`[pollChunks] Processing user join message:`, {
@@ -1615,13 +1469,10 @@ async function pollChunks() {
                             console.warn(`[pollChunks] Invalid CID in user message for ${userAddress}: ${cid}`);
                             continue;
                         }
-                        console.log(`[pollChunks] Found valid CID ${cid} for user ${userAddress} at ${msg.BlockDate}`);
                         try {
                             const data = await fetchIPFSFile(cid);
                             if (data) {
-                                console.log(`[pollChunks] Successfully fetched IPFS data for user CID ${cid}:`, data);
                                 await applySaveFile(data, msg.FromAddress, msg.BlockDate);
-                                console.log(`[pollChunks] Applied user save file for ${userAddress} from CID ${cid}`);
                             } else {
                                 console.warn(`[pollChunks] No valid data fetched for IPFS CID ${cid} for user ${userAddress}`);
                             }
@@ -1629,90 +1480,15 @@ async function pollChunks() {
                             console.warn(`[pollChunks] Failed to process IPFS file ${cid} for user ${userAddress}:`, err);
                         }
                     } else {
-                        console.log(`[pollChunks] No IPFS CID found in user join message for ${userAddress}`);
                     }
                 }
             }
         } else {
-            console.log(`[pollChunks] No address found for #${joinKeyword}`);
-        }
-        console.log(`[pollChunks] Message thread processed:`, chunkMessages);
-    }, POLL_INTERVAL);
-}
-
-
-
-    async function pollChunksOriginal() {
-    if (pollInterval) clearInterval(pollInterval);
-    if (isPromptOpen) return;
-    pollInterval = setInterval(async () => {
-        if (isPromptOpen) return;
-        const cx = Math.floor((player.position.x + WORLD_SIZE) % WORLD_SIZE / CHUNK_SIZE);
-        const cz = Math.floor((player.position.z + WORLD_SIZE) % WORLD_SIZE / CHUNK_SIZE);
-        for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
-            for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
-                const chunkX = cx + dx;
-                const chunkZ = cz + dz;
-                const chunkKey = `${chunkX},${chunkZ}`;
-                const chunkKW = `${worldName}${chunkX.toString().padStart(6, '0')}${chunkZ.toString().padStart(6, '0')}`;
-                const addressRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: chunkKW } });
-                if (addressRes?.address) {
-                    const messages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: addressRes.address }, query: { skip: 0, qty: 5000 } });
-                    for (const msg of messages || []) {
-                        const cidMatch = msg.Message.match(/IPFS:([A-Za-z0-9]+)/);
-                        const cid = cidMatch?.[1];
-                        if (cid) {
-                            // Validate CID before fetching
-                            const cidRegex = /^[A-Za-z0-9]{46}$|^[A-Za-z0-9]{59}$|^[a-z0-9]+$/;
-                            if (!cidRegex.test(cid)) {
-                                console.warn(`Invalid CID in message for chunk ${chunkKey}: ${cid}`);
-                                continue;
-                            }
-                            try {
-                                const data = await fetchIPFSFile(cid);
-                                if (data) {
-                                    await applySaveFile(data, msg.FromAddress, msg.BlockDate);
-                                } else {
-                                    console.warn(`No valid data fetched for IPFS CID ${cid} in chunk ${chunkKey}`);
-                                }
-                            } catch (err) {
-                                console.warn(`Failed to process IPFS file ${cid} for chunk ${chunkKey}:`, err);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        const addressRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: joinKeyword } });
-        if (addressRes?.address) {
-            const messages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: addressRes.address }, query: { skip: 0, qty: 5000 } });
-            for (const msg of messages || []) {
-                if (msg.FromAddress === userAddress) {
-                    const cidMatch = msg.Message.match(/IPFS:([A-Za-z0-9]+)/);
-                    const cid = cidMatch?.[1];
-                    if (cid) {
-                        // Validate CID before fetching
-                        const cidRegex = /^[A-Za-z0-9]{46}$|^[A-Za-z0-9]{59}$|^[a-z0-9]+$/;
-                        if (!cidRegex.test(cid)) {
-                            console.warn(`Invalid CID in user message for ${userAddress}: ${cid}`);
-                            continue;
-                        }
-                        try {
-                            const data = await fetchIPFSFile(cid);
-                            if (data) {
-                                await applySaveFile(data, msg.FromAddress, msg.BlockDate);
-                            } else {
-                                console.warn(`No valid data fetched for IPFS CID ${cid} for user ${userAddress}`);
-                            }
-                        } catch (err) {
-                            console.warn(`Failed to process IPFS file ${cid} for user ${userAddress}:`, err);
-                        }
-                    }
-                }
-            }
         }
     }, POLL_INTERVAL);
 }
+
+
 
     function updateBlock(cx, cz, x, y, z, blockId, fromAddress, isPlayerAction = true) {
         const chunkKey = `${cx},${cz}`;
