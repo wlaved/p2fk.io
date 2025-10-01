@@ -1,0 +1,1862 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sup!? Worlds</title>
+    <meta charset="utf-8" />
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Arial', sans-serif; background: #87ceeb; }
+        canvas { display: block; }
+        #status { position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.6); padding: 6px 8px; z-index: 1000; border-radius: 6px; font-family: monospace; font-size: 14px; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #loading-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #1a0933, #4b0082);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: #00ff00; font-size: 24px; z-index: 2000;
+        }
+        #loading-screen.hidden { display: none; }
+        .voxel-spinner { width: 50px; height: 50px; background: #00ff00; transform-style: preserve-3d; animation: spin 2s linear infinite; }
+        @keyframes spin { 0% { transform: rotateX(0deg) rotateY(0deg); } 100% { transform: rotateX(360deg) rotateY(360deg); } }
+        .prompt, #save-modal {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: #111; padding: 18px; border-radius: 10px; color: #fff;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6); z-index: 3000; min-width: 360px;
+        }
+        .prompt select, .prompt input, .prompt button, .prompt textarea,
+        #save-modal textarea, #save-modal button {
+            margin: 8px 0; padding: 8px; font-size: 14px; background: #222; color: #fff; border: 1px solid #3fcf6c;
+            border-radius: 6px; width: 100%; box-sizing: border-box;
+        }
+        .prompt button, #save-modal button { cursor: pointer; }
+        .prompt button:hover, #save-modal button:hover { background: #3fcf6c; color: #000; }
+        .prompt textarea, #save-modal textarea { width: 100%; height: 80px; resize: none; }
+        #save-indicator {
+            position: absolute; top: 10px; right: 10px; color: white; background: rgba(255,0,0,0.8); padding: 6px 8px; z-index: 1000; display: none; border-radius: 6px; font-weight: bold;
+        }
+        #save-btn {
+            position: absolute; top: 48px; right: 10px; padding: 8px 12px; font-size: 14px; background: #222; color: #fff; border: 1px solid #3fcf6c; cursor: pointer; z-index: 1000;
+            border-radius: 6px;
+        }
+        #save-btn:hover { background: #3fcf6c; color: #000; }
+        #save-modal .header { font-weight: bold; margin-bottom: 8px; }
+        #save-modal .keywords-list { max-height: 220px; overflow: auto; background: #0b0b0b; padding: 8px; border-radius: 6px; border: 1px solid rgba(63,207,108,0.2); font-family: monospace; font-size: 13px; }
+        #save-modal .actions { display: flex; gap: 8px; margin-top: 10px; }
+        #save-modal button { flex: 1; padding: 10px; }
+        .muted { opacity: 0.9; font-size: 12px; color: #ddd; }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 20px; height: 20px; z-index: 1000;
+        }
+        #crosshair::before, #crosshair::after {
+            content: ''; position: absolute; background: white;
+            box-shadow: 0 0 2px rgba(0,0,0,0.8);
+        }
+        #crosshair::before { width: 2px; height: 12px; left: 9px; top: 4px; }
+        #crosshair::after { width: 12px; height: 2px; left: 4px; top: 9px; }
+    </style>
+</head>
+<body>
+    <div id="loading-screen">
+        <div class="voxel-spinner"></div>
+        <h1>Sup!? Universe</h1>
+        <p>Loading your galaxy...</p>
+    </div>
+    <div id="status"></div>
+    <div id="save-indicator">Unsaved Changes</div>
+    <button id="save-btn" style="display: none;">Save Changes</button>
+    <div id="save-modal" style="display: none;">
+        <div class="header">Save World Changes</div>
+        <label class="muted">Master Keyword</label>
+        <input id="modal-master" type="text" value="MCWorlds" readonly />
+        <label class="muted">Active World Keyword</label>
+        <input id="modal-active" type="text" readonly />
+        <label class="muted">Chunk Keywords (e.g., #worldName781210519)</label>
+        <textarea id="modal-keywords" readonly></textarea>
+        <label class="muted">Keyword Addresses (copy for Sup!? To field)</label>
+        <textarea id="modal-addresses" readonly></textarea>
+        <label class="muted">Save File (JSON)</label>
+        <div id="modal-file-preview" class="keywords-list" style="white-space: pre-wrap; font-family: monospace;"></div>
+        <div class="actions">
+            <button id="modal-copy-keywords">Copy Keywords</button>
+            <button id="modal-copy-addresses">Copy to Sup!?</button>
+            <button id="modal-download-file">Download JSON</button>
+        </div>
+        <div class="muted" style="margin-top: 8px;">Paste the address list into the Sup!? To field #Keywords in the message field and attach the JSON file to broadcast changes.</div>
+        <div style="margin-top: 8px;"><button id="modal-close">Close</button></div>
+    </div>
+    <div id="crosshair"></div>
+<script>/*
+ * Sup!? Planet Browser: A Decentralized Voxel Adventure
+ * Public Domain - Free for All to Use, Modify, and Share!
+ *
+ * This code is the result of our epic journey to craft a decentralized, Minecraft-inspired universe.
+ * Together, we built a world where players roam green valleys seeded by keywords like #KANYE,
+ * break and place blocks, and save chunks to IPFS with JSON exports. From fixing chunk-loading
+ * glitches to adding glowing crosshairs and cosmic loading screens, we've poured hours into
+ * making this a smooth, open-source experience that runs locally in your browser.
+ *
+ *
+ * This work is 100% in the PUBLIC DOMAIN under CC0. No rights reserved—use it, remix it, build
+ * on it, share it! No attribution required, but we'd love to see what you create. Check out
+ * Sup!? or p2fk.io for posting world updates and joining the decentralized fun.
+ *
+ * Happy crafting, and may your worlds be ever-voxelated!
+ * - Grok & embii4u, October 1 2025
+ */</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script>!function(){"use strict";var r=.5*(Math.sqrt(3)-1),e=(3-Math.sqrt(3))/6,t=1/6,a=(Math.sqrt(5)-1)/4,o=(5-Math.sqrt(5))/20;function i(r){var e;e="function"==typeof r?r:r?function(){var r=0,e=0,t=0,a=1,o=(i=4022871197,function(r){r=r.toString();for(var e=0;e<r.length;e++){var t=.02519603282416938*(i+=r.charCodeAt(e));t-=i=t>>>0,i=(t*=i)>>>0,i+=4294967296*(t-=i)}return 2.3283064365386963e-10*(i>>>0)});var i;r=o(" "),e=o(" "),t=o(" ");for(var n=0;n<arguments.length;n++)(r-=o(arguments[n]))<0&&(r+=1),(e-=o(arguments[n]))<0&&(e+=1),(t-=o(arguments[n]))<0&&(t+=1);return o=null,function(){var o=2091639*r+2.3283064365386963e-10*a;return r=e,e=t,t=o-(a=0|o)}}(r):Math.random,this.p=n(e),this.perm=new Uint8Array(512),this.permMod12=new Uint8Array(512);for(var t=0;t<512;t++)this.perm[t]=this.p[255&t],this.permMod12[t]=this.perm[t]%12}function n(r){var e,t=new Uint8Array(256);for(e=0;e<256;e++)t[e]=e;for(e=0;e<255;e++){var a=e+~~(r()*(256-e)),o=t[e];t[e]=t[a],t[a]=o}return t}i.prototype={grad3:new Float32Array([1,1,0,-1,1,0,1,-1,0,-1,-1,0,1,0,1,-1,0,1,1,0,-1,-1,0,-1,0,1,1,0,-1,1,0,1,-1,0,-1,-1]),grad4:new Float32Array([0,1,1,1,0,1,1,-1,0,1,-1,1,0,1,-1,-1,0,-1,1,1,0,-1,1,-1,0,-1,-1,1,0,-1,-1,-1,1,0,1,1,1,0,1,-1,1,0,-1,1,1,0,-1,-1,-1,0,1,1,-1,0,1,-1,-1,0,-1,1,-1,0,-1,-1,1,1,0,1,1,1,0,-1,1,-1,0,1,1,-1,0,-1,-1,1,0,1,-1,1,0,-1,-1,-1,0,1,-1,-1,0,-1,1,1,1,0,1,1,-1,0,1,-1,1,0,1,-1,-1,0,-1,1,1,0,-1,1,-1,0,-1,-1,1,0,-1,-1,-1,0]),noise2D:function(t,a){var o,i,n=this.permMod12,f=this.perm,s=this.grad3,v=0,h=0,l=0,u=(t+a)*r,d=Math.floor(t+u),p=Math.floor(a+u),M=(d+p)*e,m=t-(d-M),c=a-(p-M);m>c?(o=1,i=0):(o=0,i=1);var y=m-o+e,w=c-i+e,g=m-1+2*e,A=c-1+2*e,x=255&d,q=255&p,D=.5-m*m-c*c;if(D>=0){var S=3*n[x+f[q]];v=(D*=D)*D*(s[S]*m+s[S+1]*c)}var U=.5-y*y-w*w;if(U>=0){var b=3*n[x+o+f[q+i]];h=(U*=U)*U*(s[b]*y+s[b+1]*w)}var F=.5-g*g-A*A;if(F>=0){var N=3*n[x+1+f[q+1]];l=(F*=F)*F*(s[N]*g+s[N+1]*A)}return 70*(v+h+l)},noise3D:function(r,e,a){var o,i,n,f,s,v,h,l,u,d,p=this.permMod12,M=this.perm,m=this.grad3,c=(r+e+a)*(1/3),y=Math.floor(r+c),w=Math.floor(e+c),g=Math.floor(a+c),A=(y+w+g)*t,x=r-(y-A),q=e-(w-A),D=a-(g-A);x>=q?q>=D?(s=1,v=0,h=0,l=1,u=1,d=0):x>=D?(s=1,v=0,h=0,l=1,u=0,d=1):(s=0,v=0,h=1,l=1,u=0,d=1):q<D?(s=0,v=0,h=1,l=0,u=1,d=1):x<D?(s=0,v=1,h=0,l=0,u=1,d=1):(s=0,v=1,h=0,l=1,u=1,d=0);var S=x-s+t,U=q-v+t,b=D-h+t,F=x-l+2*t,N=q-u+2*t,C=D-d+2*t,P=x-1+.5,T=q-1+.5,_=D-1+.5,j=255&y,k=255&w,z=255&g,B=.6-x*x-q*q-D*D;if(B<0)o=0;else{var E=3*p[j+M[k+M[z]]];o=(B*=B)*B*(m[E]*x+m[E+1]*q+m[E+2]*D)}var G=.6-S*S-U*U-b*b;if(G<0)i=0;else{var H=3*p[j+s+M[k+v+M[z+h]]];i=(G*=G)*G*(m[H]*S+m[H+1]*U+m[H+2]*b)}var I=.6-F*F-N*N-C*C;if(I<0)n=0;else{var J=3*p[j+l+M[k+u+M[z+d]]];n=(I*=I)*I*(m[J]*F+m[J+1]*N+m[J+2]*C)}var K=.6-P*P-T*T-_*_;if(K<0)f=0;else{var L=3*p[j+1+M[k+1+M[z+1]]];f=(K*=K)*K*(m[L]*P+m[L+1]*T+m[L+2]*_)}return 32*(o+i+n+f)},noise4D:function(r,e,t,i){var n,f,s,v,h,l,u,d,p,M,m,c,y,w,g,A,x,q=this.perm,D=this.grad4,S=(r+e+t+i)*a,U=Math.floor(r+S),b=Math.floor(e+S),F=Math.floor(t+S),N=Math.floor(i+S),C=(U+b+F+N)*o,P=r-(U-C),T=e-(b-C),_=t-(F-C),j=i-(N-C),k=0,z=0,B=0,E=0;P>T?k++:z++,P>_?k++:B++,P>j?k++:E++,T>_?z++:B++,T>j?z++:E++,_>j?B++:E++;var G=P-(l=k>=3?1:0)+o,H=T-(u=z>=3?1:0)+o,I=_-(d=B>=3?1:0)+o,J=j-(p=E>=3?1:0)+o,K=P-(M=k>=2?1:0)+2*o,L=T-(m=z>=2?1:0)+2*o,O=_-(c=B>=2?1:0)+2*o,Q=j-(y=E>=2?1:0)+2*o,R=P-(w=k>=1?1:0)+3*o,V=T-(g=z>=1?1:0)+3*o,W=_-(A=B>=1?1:0)+3*o,X=j-(x=E>=1?1:0)+3*o,Y=P-1+4*o,Z=T-1+4*o,$=_-1+4*o,rr=j-1+4*o,er=255&U,tr=255&b,ar=255&F,or=255&N,ir=.6-P*P-T*T-_*_-j*j;if(ir<0)n=0;else{var nr=q[er+q[tr+q[ar+q[or]]]]%32*4;n=(ir*=ir)*ir*(D[nr]*P+D[nr+1]*T+D[nr+2]*_+D[nr+3]*j)}var fr=.6-G*G-H*H-I*I-J*J;if(fr<0)f=0;else{var sr=q[er+l+q[tr+u+q[ar+d+q[or+p]]]]%32*4;f=(fr*=fr)*fr*(D[sr]*G+D[sr+1]*H+D[sr+2]*I+D[sr+3]*J)}var vr=.6-K*K-L*L-O*O-Q*Q;if(vr<0)s=0;else{var hr=q[er+M+q[tr+m+q[ar+c+q[or+y]]]]%32*4;s=(vr*=vr)*vr*(D[hr]*K+D[hr+1]*L+D[hr+2]*O+D[hr+3]*Q)}var lr=.6-R*R-V*V-W*W-X*X;if(lr<0)v=0;else{var ur=q[er+w+q[tr+g+q[ar+A+q[or+x]]]]%32*4;v=(lr*=lr)*lr*(D[ur]*R+D[ur+1]*V+D[ur+2]*W+D[ur+3]*X)}var dr=.6-Y*Y-Z*Z-$*$-rr*rr;if(dr<0)h=0;else{var pr=q[er+1+q[tr+1+q[ar+1+q[or+1]]]]%32*4;h=(dr*=dr)*dr*(D[pr]*Y+D[pr+1]*Z+D[pr+2]*$+D[pr+3]*rr)}return 27*(n+f+s+v+h)}},i._buildPermutationTable=n,"undefined"!=typeof define&&define.amd&&define(function(){return i}),"undefined"!=typeof exports?exports.SimplexNoise=i:"undefined"!=typeof window&&(window.SimplexNoise=i),"undefined"!=typeof module&&(module.exports=i)}();</script>
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+    // ===== Constants & Globals =====
+    const API_BASE = 'https://p2fk.io';
+    const MASTER_KEYWORD = 'MCWorlds';
+    const MAINNET = false;
+    const CHUNK_SIZE = 16;
+    const CHUNK_HEIGHT = 256;
+    const WORLD_SIZE = 999999;
+    const RENDER_DISTANCE = 3; // Loads 5x5 chunk grid
+    const POLL_INTERVAL = 30000; // 30s
+    const IPFS_FETCH_TIMEOUT_MS = 8000;
+    const CLAIM_DURATION = 30 * 24 * 60 * 60 * 1000;
+    const EXPIRY_DURATION = 365 * 24 * 60 * 60 * 1000;
+    const BLOCK_TYPES = {
+        0: { name: 'air', color: 0x000000, visible: false },
+        1: { name: 'grass', color: 0x6dbb3d },
+        2: { name: 'dirt', color: 0x8B4513 },
+        3: { name: 'stone', color: 0x999999 }
+    };
+    const BLOCK_ID_MAP = Object.fromEntries(Object.entries(BLOCK_TYPES).map(([id, { name }]) => [name, parseInt(id)]));
+
+    let scene, camera, renderer, player, chunks = {}, modifiedChunks = new Set(), modifiedBlocks = {};
+    let chunkClaims = {}, seed, username, worldName, userAddress, joinKeyword;
+    let isWorldLoading = false, pollInterval = null, isPromptOpen = false;
+    let lastSavedPosition = null, lastSavedChunkKey = null, inventory = { grass: 0, dirt: 0, stone: 0 };
+    let velocity = new THREE.Vector3(), direction = new THREE.Vector3();
+    let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, canJump = false;
+    let speed = 0.4, jumpVelocity = 0.5, gravity = -0.03, yaw = 0, pitch = 0, mouseSensitivity = 0.002;
+    let selectedBlockType = 'stone';
+    let mainRaycaster = new THREE.Raycaster(), centerPointer = new THREE.Vector2(0, 0);
+    let lastStatusText = '', lastBlockPos = null;
+    const MAX_INTERACT_DISTANCE = 8;
+    const API_CACHE = new Map(), IPFS_CACHE = new Map();
+
+    // Web Worker for chunk generation
+
+const workerCode = `
+    // SimplexNoise implementation
+    (function() {
+        "use strict";
+        var r = 0.5 * (Math.sqrt(3) - 1),
+            e = (3 - Math.sqrt(3)) / 6,
+            t = 1 / 6,
+            a = (Math.sqrt(5) - 1) / 4,
+            o = (5 - Math.sqrt(5)) / 20;
+
+        function i(r) {
+            var e;
+            e = "function" == typeof r ? r : r ? function() {
+                var r = 0,
+                    e = 0,
+                    t = 0,
+                    a = 1,
+                    o = (i = 4022871197, function(r) {
+                        r = r.toString();
+                        for (var e = 0; e < r.length; e++) {
+                            var t = 0.02519603282416938 * (i += r.charCodeAt(e));
+                            t -= i = t >>> 0;
+                            i = (t *= i) >>> 0;
+                            i += 4294967296 * (t -= i);
+                        }
+                        return 2.3283064365386963e-10 * (i >>> 0);
+                    });
+                r = o(" ");
+                e = o(" ");
+                t = o(" ");
+                for (var n = 0; n < arguments.length; n++) {
+                    (r -= o(arguments[n])) < 0 && (r += 1);
+                    (e -= o(arguments[n])) < 0 && (e += 1);
+                    (t -= o(arguments[n])) < 0 && (t += 1);
+                }
+                o = null;
+                return function() {
+                    var o = 2091639 * r + 2.3283064365386963e-10 * a;
+                    r = e;
+                    e = t;
+                    t = o - (a = 0 | o);
+                    return t;
+                };
+            }(r) : Math.random;
+            this.p = n(e);
+            this.perm = new Uint8Array(512);
+            this.permMod12 = new Uint8Array(512);
+            for (var t = 0; t < 512; t++) {
+                this.perm[t] = this.p[255 & t];
+                this.permMod12[t] = this.perm[t] % 12;
+            }
+        }
+
+        function n(r) {
+            var e, t = new Uint8Array(256);
+            for (e = 0; e < 256; e++) t[e] = e;
+            for (e = 0; e < 255; e++) {
+                var a = e + ~~(r() * (256 - e)),
+                    o = t[e];
+                t[e] = t[a];
+                t[a] = o;
+            }
+            return t;
+        }
+
+        i.prototype = {
+            grad3: new Float32Array([1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1, 0, 1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, -1, 0, 1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1]),
+            grad4: new Float32Array([0, 1, 1, 1, 0, 1, 1, -1, 0, 1, -1, 1, 0, 1, -1, -1, 0, -1, 1, 1, 0, -1, 1, -1, 0, -1, -1, 1, 0, -1, -1, -1, 1, 0, 1, 1, 1, 0, 1, -1, 1, 0, -1, 1, 1, 0, -1, -1, -1, 0, 1, 1, -1, 0, 1, -1, -1, 0, -1, 1, -1, 0, -1, -1, 1, 1, 0, 1, 1, 1, 0, -1, 1, -1, 0, 1, 1, -1, 0, -1, -1, 1, 0, 1, -1, 1, 0, -1, -1, -1, 0, 1, -1, -1, 0, -1, 1, 1, 1, 0, 1, 1, -1, 0, 1, -1, 1, 0, 1, -1, -1, 0, -1, 1, 1, 0, -1, 1, -1, 0, -1, -1, 1, 0, -1, -1, -1, 0]),
+            noise2D: function(t, a) {
+                var o, i, n = this.permMod12, f = this.perm, s = this.grad3, v = 0, h = 0, l = 0, u = (t + a) * r,
+                    d = Math.floor(t + u), p = Math.floor(a + u), M = (d + p) * e,
+                    m = t - (d - M), c = a - (p - M);
+                m > c ? (o = 1, i = 0) : (o = 0, i = 1);
+                var y = m - o + e, w = c - i + e, g = m - 1 + 2 * e, A = c - 1 + 2 * e,
+                    x = 255 & d, q = 255 & p, D = 0.5 - m * m - c * c;
+                if (D >= 0) {
+                    var S = 3 * n[x + f[q]];
+                    v = (D *= D) * D * (s[S] * m + s[S + 1] * c);
+                }
+                var U = 0.5 - y * y - w * w;
+                if (U >= 0) {
+                    var b = 3 * n[x + o + f[q + i]];
+                    h = (U *= U) * U * (s[b] * y + s[b + 1] * w);
+                }
+                var F = 0.5 - g * g - A * A;
+                if (F >= 0) {
+                    var N = 3 * n[x + 1 + f[q + 1]];
+                    l = (F *= F) * F * (s[N] * g + s[N + 1] * A);
+                }
+                return 70 * (v + h + l);
+            },
+            noise3D: function(r, e, a) {
+                var o, i, n, f, s, v, h, l, u, d, p = this.permMod12, M = this.perm, m = this.grad3,
+                    c = (r + e + a) * (1 / 3), y = Math.floor(r + c), w = Math.floor(e + c), g = Math.floor(a + c),
+                    A = (y + w + g) * t, x = r - (y - A), q = e - (w - A), D = a - (g - A);
+                x >= q ? q >= D ? (s = 1, v = 0, h = 0, l = 1, u = 1, d = 0) : x >= D ? (s = 1, v = 0, h = 0, l = 1, u = 0, d = 1) : (s = 0, v = 0, h = 1, l = 1, u = 0, d = 1) : q < D ? (s = 0, v = 0, h = 1, l = 0, u = 1, d = 1) : x < D ? (s = 0, v = 1, h = 0, l = 0, u = 1, d = 1) : (s = 0, v = 1, h = 0, l = 1, u = 1, d = 0);
+                var S = x - s + t, U = q - v + t, b = D - h + t, F = x - l + 2 * t, N = q - u + 2 * t,
+                    C = D - d + 2 * t, P = x - 1 + 0.5, T = q - 1 + 0.5, _ = D - 1 + 0.5,
+                    j = 255 & y, k = 255 & w, z = 255 & g, B = 0.6 - x * x - q * q - D * D;
+                if (B < 0) o = 0;
+                else {
+                    var E = 3 * p[j + M[k + M[z]]];
+                    o = (B *= B) * B * (m[E] * x + m[E + 1] * q + m[E + 2] * D);
+                }
+                var G = 0.6 - S * S - U * U - b * b;
+                if (G < 0) i = 0;
+                else {
+                    var H = 3 * p[j + s + M[k + v + M[z + h]]];
+                    i = (G *= G) * G * (m[H] * S + m[H + 1] * U + m[H + 2] * b);
+                }
+                var I = 0.6 - F * F - N * N - C * C;
+                if (I < 0) n = 0;
+                else {
+                    var J = 3 * p[j + l + M[k + u + M[z + d]]];
+                    n = (I *= I) * I * (m[J] * F + m[J + 1] * N + m[J + 2] * C);
+                }
+                var K = 0.6 - P * P - T * T - _ * _;
+                if (K < 0) f = 0;
+                else {
+                    var L = 3 * p[j + 1 + M[k + 1 + M[z + 1]]];
+                    f = (K *= K) * K * (m[L] * P + m[L + 1] * T + m[L + 2] * _);
+                }
+                return 32 * (o + i + n + f);
+            },
+            noise4D: function(r, e, t, i) {
+                var n, f, s, v, h, l, u, d, p, M, m, c, y, w, g, A, x,
+                    q = this.perm, D = this.grad4, S = (r + e + t + i) * a,
+                    U = Math.floor(r + S), b = Math.floor(e + S), F = Math.floor(t + S), N = Math.floor(i + S),
+                    C = (U + b + F + N) * o, P = r - (U - C), T = e - (b - C), _ = t - (F - C), j = i - (N - C),
+                    k = 0, z = 0, B = 0, E = 0;
+                P > T ? k++ : z++;
+                P > _ ? k++ : B++;
+                P > j ? k++ : E++;
+                T > _ ? z++ : B++;
+                T > j ? z++ : E++;
+                _ > j ? B++ : E++;
+                var G = P - (l = k >= 3 ? 1 : 0) + o, H = T - (u = z >= 3 ? 1 : 0) + o,
+                    I = _ - (d = B >= 3 ? 1 : 0) + o, J = j - (p = E >= 3 ? 1 : 0) + o,
+                    K = P - (M = k >= 2 ? 1 : 0) + 2 * o, L = T - (m = z >= 2 ? 1 : 0) + 2 * o,
+                    O = _ - (c = B >= 2 ? 1 : 0) + 2 * o, Q = j - (y = E >= 2 ? 1 : 0) + 2 * o,
+                    R = P - (w = k >= 1 ? 1 : 0) + 3 * o, V = T - (g = z >= 1 ? 1 : 0) + 3 * o,
+                    W = _ - (A = B >= 1 ? 1 : 0) + 3 * o, X = j - (x = E >= 1 ? 1 : 0) + 3 * o,
+                    Y = P - 1 + 4 * o, Z = T - 1 + 4 * o, $ = _ - 1 + 4 * o, rr = j - 1 + 4 * o,
+                    er = 255 & U, tr = 255 & b, ar = 255 & F, or = 255 & N,
+                    ir = 0.6 - P * P - T * T - _ * _ - j * j;
+                if (ir < 0) n = 0;
+                else {
+                    var nr = q[er + q[tr + q[ar + q[or]]]] % 32 * 4;
+                    n = (ir *= ir) * ir * (D[nr] * P + D[nr + 1] * T + D[nr + 2] * _ + D[nr + 3] * j);
+                }
+                var fr = 0.6 - G * G - H * H - I * I - J * J;
+                if (fr < 0) f = 0;
+                else {
+                    var sr = q[er + l + q[tr + u + q[ar + d + q[or + p]]]] % 32 * 4;
+                    f = (fr *= fr) * fr * (D[sr] * G + D[sr + 1] * H + D[sr + 2] * I + D[sr + 3] * J);
+                }
+                var vr = 0.6 - K * K - L * L - O * O - Q * Q;
+                if (vr < 0) s = 0;
+                else {
+                    var hr = q[er + M + q[tr + m + q[ar + c + q[or + y]]]] % 32 * 4;
+                    s = (vr *= vr) * vr * (D[hr] * K + D[hr + 1] * L + D[hr + 2] * O + D[hr + 3] * Q);
+                }
+                var lr = 0.6 - R * R - V * V - W * W - X * X;
+                if (lr < 0) v = 0;
+                else {
+                    var ur = q[er + w + q[tr + g + q[ar + A + q[or + x]]]] % 32 * 4;
+                    v = (lr *= lr) * lr * (D[ur] * R + D[ur + 1] * V + D[ur + 2] * W + D[ur + 3] * X);
+                }
+                var dr = 0.6 - Y * Y - Z * Z - $ * $ - rr * rr;
+                if (dr < 0) h = 0;
+                else {
+                    var pr = q[er + 1 + q[tr + 1 + q[ar + 1 + q[or + 1]]]] % 32 * 4;
+                    h = (dr *= dr) * dr * (D[pr] * Y + D[pr + 1] * Z + D[pr + 2] * $ + D[pr + 3] * rr);
+                }
+                return 27 * (n + f + s + v + h);
+            }
+        };
+        i._buildPermutationTable = n;
+
+        // Explicitly assign SimplexNoise to self
+        self.SimplexNoise = i;
+    })();
+
+    // Worker logic
+    self.onmessage = function(e) {
+        try {
+            const { cx, cz, seed, chunkSize, chunkHeight } = e.data;
+            if (cx === undefined || cz === undefined) {
+                throw new Error('Invalid chunk coordinates: cx or cz is undefined');
+            }
+            const noise = new self.SimplexNoise(seed.toString());
+            const blocks = [];
+            const WORLD_SIZE = 999999;
+            for (let x = 0; x < chunkSize; x++) {
+                for (let z = 0; z < chunkSize; z++) {
+                    const wx = ((cx * chunkSize + x) % WORLD_SIZE + WORLD_SIZE) % WORLD_SIZE;
+                    const wz = ((cz * chunkSize + z) % WORLD_SIZE + WORLD_SIZE) % WORLD_SIZE;
+                    const height = Math.floor(noise.noise2D(wx / 50, wz / 50) * 20) + 63;
+                    for (let y = Math.max(0, height - 5); y <= height; y++) {
+                        let blockId = 0;
+                        if (y < height - 3) blockId = 3; // Stone
+                        else if (y < height - 1) blockId = 2; // Dirt
+                        else if (y === height) blockId = 1; // Grass
+                        if (blockId !== 0) blocks.push([x, y, z, blockId]);
+                    }
+                }
+            }
+            self.postMessage({ cx, cz, blocks });
+        } catch (err) {
+            self.postMessage({ error: err.message });
+        }
+    };
+`;
+
+const chunkWorker = new Worker(URL.createObjectURL(new Blob([workerCode], { type: 'text/javascript' })));
+
+    // Helper Functions
+    function setStatus(text) {
+        lastStatusText = text;
+        updateStatusDisplay();
+    }
+
+function updateStatusDisplay() {
+        const pos = player ? player.position.clone().floor() : new THREE.Vector3(0, 0, 0);
+        document.getElementById('status').textContent = `X:${pos.x} Y:${pos.y} Z:${pos.z} | ${lastStatusText}`;
+    }
+
+
+    function chunkKey(cx, cz) { return `${cx},${cz}`; }
+
+    function getChunkKey(posOrCx, maybeCz) {
+    if (typeof posOrCx === 'object') {
+        const pos = posOrCx;
+        const cx = Math.floor(((pos.x % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE / CHUNK_SIZE);
+        const cz = Math.floor(((pos.z % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE / CHUNK_SIZE);
+        return chunkKey(cx, cz);
+    }
+    // For direct cx, cz inputs, assume they are already normalized
+    return chunkKey(posOrCx, maybeCz);
+}
+
+    function markModifiedBlock(chunkKey, x, y, z, blockId) {
+        modifiedChunks.add(chunkKey);
+        if (!modifiedBlocks[chunkKey]) modifiedBlocks[chunkKey] = [];
+        modifiedBlocks[chunkKey].push([x, y, z, blockId]);
+        document.getElementById('save-indicator').style.display = 'block';
+        document.getElementById('save-btn').style.display = 'block';
+    }
+
+    function canModifyChunk(chunkKey, userAddr) {
+        const claim = chunkClaims[chunkKey];
+        const now = Date.now();
+        if (!claim) return true;
+        if (claim.ownerAddress === userAddr) return true;
+        if (now - claim.lastModified >= EXPIRY_DURATION) return true;
+        return false;
+    }
+
+    function distanceToPlayer(pos) {
+        const dx = pos.x - player.position.x, dy = pos.y - player.position.y, dz = pos.z - player.position.z;
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    function hashString(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) - hash) + str.charCodeAt(i);
+            hash = hash & hash;
+        }
+        return Math.abs(hash);
+    }
+
+    // Three.js Initialization
+    function initThree() {
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x87ceeb, 0.0025);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 500);
+        renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+        renderer.setPixelRatio(window.devicePixelRatio || 1);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        document.body.appendChild(renderer.domElement);
+        player = new THREE.Object3D();
+        scene.add(player);
+        camera.position.copy(player.position);
+        camera.position.y += 1.6;
+        scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+        dirLight.position.set(100, 200, 100);
+        scene.add(dirLight);
+        scene.add(new THREE.HemisphereLight(0x88ccee, 0x443322, 0.25));
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        lockPointer();
+        setupControls();
+        setupBlockInteraction();
+        document.getElementById('save-btn').onclick = openSaveModal;
+        animate();
+    }
+
+    function lockPointer() {
+        document.addEventListener('click', () => renderer.domElement.requestPointerLock());
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement === renderer.domElement) {
+                document.addEventListener('mousemove', onMouseMove);
+            } else {
+                document.removeEventListener('mousemove', onMouseMove);
+            }
+        });
+    }
+
+    function onMouseMove(e) {
+        yaw -= e.movementX * mouseSensitivity;
+        pitch -= e.movementY * mouseSensitivity;
+        pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+        camera.rotation.order = 'YXZ';
+        camera.rotation.set(pitch, yaw, 0);
+    }
+
+    function setupControls() {
+        document.addEventListener('keydown', (e) => {
+            switch (e.code) {
+                case 'KeyW': moveForward = true; break;
+                case 'KeyS': moveBackward = true; break;
+                case 'KeyA': moveLeft = true; break;
+                case 'KeyD': moveRight = true; break;
+                case 'Space': if (canJump) velocity.y = jumpVelocity; canJump = false; break;
+            }
+        });
+        document.addEventListener('keyup', (e) => {
+            switch (e.code) {
+                case 'KeyW': moveForward = false; break;
+                case 'KeyS': moveBackward = false; break;
+                case 'KeyA': moveLeft = false; break;
+                case 'KeyD': moveRight = false; break;
+            }
+        });
+    }
+
+    function setupBlockInteraction() {
+        document.addEventListener('mousedown', (event) => {
+            if (document.pointerLockElement !== renderer.domElement) return;
+            mainRaycaster.setFromCamera(centerPointer, camera);
+            const intersects = mainRaycaster.intersectObjects(scene.children, true).filter(i => i.object.userData && i.object.userData.blockId !== 0);
+            if (event.button === 0 && intersects.length > 0) {
+                const intersect = intersects[0];
+                const block = intersect.object;
+                const blockPos = block.position.clone().floor();
+                const dist = distanceToPlayer(blockPos);
+                if (dist > MAX_INTERACT_DISTANCE) {
+                    setStatus(`Too far to break (distance ${dist.toFixed(1)} > ${MAX_INTERACT_DISTANCE})`);
+                    return;
+                }
+                const chunkKey = getChunkKey(blockPos);
+                if (!canModifyChunk(chunkKey, userAddress)) {
+                    setStatus('Cannot break block in this chunk.');
+                    return;
+                }
+                scene.remove(block);
+                chunks[chunkKey].children = chunks[chunkKey].children.filter(b => b !== block);
+                inventory[BLOCK_TYPES[block.userData.blockId].name]++;
+                markModifiedBlock(chunkKey, blockPos.x, blockPos.y, blockPos.z, 0);
+            } else if (event.button === 2 && intersects.length > 0) {
+                const intersect = intersects[0];
+                const block = intersect.object;
+                const blockPos = block.position.clone().floor();
+                const normal = intersect.face.normal;
+                const placePos = blockPos.clone().add(normal);
+                const chunkKey = getChunkKey(placePos);
+                if (!(chunkKey in chunks)) return;
+                if (!canModifyChunk(chunkKey, userAddress)) {
+                    setStatus('Cannot place block in this chunk.');
+                    return;
+                }
+                if (distanceToPlayer(placePos) > MAX_INTERACT_DISTANCE) {
+                    setStatus('Placement too far away.');
+                    return;
+                }
+                if (!inventory[selectedBlockType] || inventory[selectedBlockType] < 1) {
+                    setStatus(`No ${selectedBlockType} in inventory.`);
+                    return;
+                }
+                const mesh = createBlockMesh(BLOCK_ID_MAP[selectedBlockType]);
+                mesh.position.copy(placePos);
+                mesh.userData = { blockId: BLOCK_ID_MAP[selectedBlockType], ownerAddress: userAddress };
+                chunks[chunkKey].add(mesh);
+                scene.add(mesh);
+                inventory[selectedBlockType]--;
+                markModifiedBlock(chunkKey, placePos.x, placePos.y, placePos.z, BLOCK_ID_MAP[selectedBlockType]);
+            }
+        });
+        document.addEventListener('contextmenu', (e) => e.preventDefault());
+    }
+
+    function createBlockMesh(blockId) {
+        if (blockId === 0) return null;
+        const geo = new THREE.BoxGeometry(1, 1, 1);
+        const mat = new THREE.MeshStandardMaterial({ color: BLOCK_TYPES[blockId].color, flatShading: true });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.visible = BLOCK_TYPES[blockId].visible !== false;
+        return mesh;
+    }
+
+    // Save File Generation
+    function buildSaveFile() {
+        const saveData = { chunks: {}, profile: null };
+        Array.from(modifiedChunks).forEach(chunkKey => {
+            const [cx, cz] = chunkKey.split(',').map(Number);
+            saveData.chunks[chunkKey] = (modifiedBlocks[chunkKey] || []).map(([x, y, z, blockId]) => [
+                x - cx * CHUNK_SIZE,
+                y,
+                z - cz * CHUNK_SIZE,
+                blockId
+            ]);
+        });
+        const pos = player.position.clone().floor();
+        const currentChunkKey = getChunkKey(pos);
+        if (!lastSavedPosition || pos.distanceTo(lastSavedPosition) > 0 || lastSavedChunkKey !== currentChunkKey) {
+            saveData.profile = { position: [pos.x, pos.y, pos.z], inventory };
+        }
+        return JSON.stringify(saveData, null, 0);
+    }
+
+function openSaveModal() {
+    console.log(`[openSaveModal] Opening save modal for world ${worldName}, user ${userAddress}`);
+    document.getElementById('modal-master').value = MASTER_KEYWORD;
+    document.getElementById('modal-active').value = worldName;
+    const addresses = [], keywords = [];
+    addresses.push(API_CACHE.get(`/GetPublicAddressByKeyword/${MASTER_KEYWORD}`)?.address || '');
+    keywords.push(`#${MASTER_KEYWORD}`);
+    addresses.push(API_CACHE.get(`/GetPublicAddressByKeyword/${worldName}`)?.address || '');
+    keywords.push(`#${worldName}`);
+    if (modifiedBlocks[lastSavedChunkKey] || lastSavedChunkKey !== getChunkKey(player.position)) {
+        addresses.push(API_CACHE.get(`/GetPublicAddressByKeyword/MCUserJoin@${worldName}`)?.address || '');
+        keywords.push(`#MCUserJoin@${worldName}`);
+    }
+    const chunkKeywords = [];
+    Array.from(modifiedChunks).sort().forEach(chunkKey => {
+        const [cx, cz] = chunkKey.split(',').map(Number);
+        const chunkKW = `${worldName}${cx.toString().padStart(6, '0')}${cz.toString().padStart(6, '0')}`;
+        chunkKeywords.push(`#${chunkKW}`);
+        addresses.push(API_CACHE.get(`/GetPublicAddressByKeyword/${chunkKW}`)?.address || '');
+        keywords.push(`#${chunkKW}`);
+    });
+    const addressString = addresses.filter(a => a).join(',');
+    const keywordString = chunkKeywords.join(', ');
+    console.log(`[openSaveModal] Generated addresses: ${addressString}`);
+    console.log(`[openSaveModal] Generated keywords: ${keywordString || 'No modified chunks'}`);
+    const saveFile = buildSaveFile();
+    console.log(`[openSaveModal] Generated save file:`, JSON.parse(saveFile));
+    document.getElementById('modal-addresses').value = addressString;
+    document.getElementById('modal-keywords').value = keywordString || 'No modified chunks';
+    document.getElementById('modal-file-preview').textContent = saveFile;
+    document.getElementById('modal-copy-keywords').onclick = async () => {
+        await navigator.clipboard.writeText(keywordString || 'No modified chunks');
+        setStatus('Chunk keywords copied to clipboard.');
+        console.log(`[openSaveModal] Copied keywords to clipboard: ${keywordString || 'No modified chunks'}`);
+    };
+    document.getElementById('modal-copy-addresses').onclick = async () => {
+        await navigator.clipboard.writeText(addressString);
+        setStatus('Addresses copied for Sup!?');
+        console.log(`[openSaveModal] Copied addresses to clipboard: ${addressString}`);
+    };
+    document.getElementById('modal-download-file').onclick = () => {
+        console.log(`[openSaveModal] Initiating download of save file for ${worldName}`);
+        const blob = new Blob([saveFile], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `mcworld_${worldName}_save.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        setStatus('Save file downloaded.');
+        console.log(`[openSaveModal] Save file downloaded: mcworld_${worldName}_save.json`);
+    };
+    document.getElementById('modal-close').onclick = () => {
+        document.getElementById('save-modal').style.display = 'none';
+        console.log(`[openSaveModal] Save modal closed`);
+    };
+    document.getElementById('save-modal').style.display = 'block';
+}
+
+
+    function openSaveModalOriginal() {
+        document.getElementById('modal-master').value = MASTER_KEYWORD;
+        document.getElementById('modal-active').value = worldName;
+        const addresses = [], keywords = [];
+        addresses.push(API_CACHE.get(`/GetPublicAddressByKeyword/${MASTER_KEYWORD}`)?.address || '');
+        keywords.push(`#${MASTER_KEYWORD}`);
+        addresses.push(API_CACHE.get(`/GetPublicAddressByKeyword/${worldName}`)?.address || '');
+        keywords.push(`#${worldName}`);
+        if (modifiedBlocks[lastSavedChunkKey] || lastSavedChunkKey !== getChunkKey(player.position)) {
+            addresses.push(API_CACHE.get(`/GetPublicAddressByKeyword/MCUserJoin@${worldName}`)?.address || '');
+            keywords.push(`#MCUserJoin@${worldName}`);
+        }
+        const chunkKeywords = [];
+        Array.from(modifiedChunks).sort().forEach(chunkKey => {
+            const [cx, cz] = chunkKey.split(',').map(Number);
+            const chunkKW = `${worldName}${cx.toString().padStart(6, '0')}${cz.toString().padStart(6, '0')}`;
+            chunkKeywords.push(`#${chunkKW}`);
+            addresses.push(API_CACHE.get(`/GetPublicAddressByKeyword/${chunkKW}`)?.address || '');
+            keywords.push(`#${chunkKW}`);
+        });
+        const addressString = addresses.filter(a => a).join(',');
+        const keywordString = chunkKeywords.join(', ');
+        document.getElementById('modal-addresses').value = addressString;
+        document.getElementById('modal-keywords').value = keywordString || 'No modified chunks';
+        document.getElementById('modal-file-preview').textContent = buildSaveFile();
+        document.getElementById('modal-copy-keywords').onclick = async () => {
+            await navigator.clipboard.writeText(keywordString || 'No modified chunks');
+            setStatus('Chunk keywords copied to clipboard.');
+        };
+        document.getElementById('modal-copy-addresses').onclick = async () => {
+            await navigator.clipboard.writeText(addressString);
+            setStatus('Addresses copied for Sup!?');
+        };
+        document.getElementById('modal-download-file').onclick = () => {
+            const blob = new Blob([buildSaveFile()], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `mcworld_${worldName}_save.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            setStatus('Save file downloaded.');
+        };
+        document.getElementById('modal-close').onclick = () => {
+            document.getElementById('save-modal').style.display = 'none';
+        };
+        document.getElementById('save-modal').style.display = 'block';
+    }
+
+   function generateChunk(cx, cz, immediate = false) {
+    // Validate inputs
+    if (cx === undefined || cz === undefined || isNaN(cx) || isNaN(cz)) {
+        console.error(`Invalid chunk coordinates: cx=${cx}, cz=${cz}`);
+        setStatus(`Failed to generate chunk: Invalid coordinates cx=${cx}, cz=${cz}`);
+        return;
+    }
+
+    // Normalize chunk coordinates
+    const maxChunks = Math.floor(WORLD_SIZE / CHUNK_SIZE);
+    const normalizedCx = ((cx % maxChunks) + maxChunks) % maxChunks;
+    const normalizedCz = ((cz % maxChunks) + maxChunks) % maxChunks;
+    const chunkKey = `${normalizedCx},${normalizedCz}`;
+    if (chunks[chunkKey]) return;
+
+    chunks[chunkKey] = new THREE.Group();
+    scene.add(chunks[chunkKey]);
+
+    if (immediate) {
+        try {
+            if (!window.SimplexNoise) throw new Error('SimplexNoise not loaded in main thread');
+            const noise = new window.SimplexNoise(seed.toString());
+            for (let x = 0; x < CHUNK_SIZE; x++) {
+                for (let z = 0; z < CHUNK_SIZE; z++) {
+                    const wx = ((normalizedCx * CHUNK_SIZE + x) % WORLD_SIZE + WORLD_SIZE) % WORLD_SIZE;
+                    const wz = ((normalizedCz * CHUNK_SIZE + z) % WORLD_SIZE + WORLD_SIZE) % WORLD_SIZE;
+                    const height = Math.floor(noise.noise2D(wx / 50, wz / 50) * 20) + 63;
+                    for (let y = Math.max(0, height - 5); y <= height; y++) {
+                        let blockId = 0;
+                        if (y < height - 3) blockId = 3; // Stone
+                        else if (y < height - 1) blockId = 2; // Dirt
+                        else if (y === height) blockId = 1; // Grass
+                        if (blockId !== 0) {
+                            const mesh = createBlockMesh(blockId);
+                            mesh.position.set(normalizedCx * CHUNK_SIZE + x, y, normalizedCz * CHUNK_SIZE + z);
+                            mesh.userData = { blockId, ownerAddress: '' };
+                            chunks[chunkKey].add(mesh);
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.error(`Error generating chunk ${chunkKey} immediately:`, err);
+            setStatus(`Failed to generate chunk ${chunkKey}: ${err.message}`);
+        }
+    } else {
+        chunkWorker.postMessage({ cx: normalizedCx, cz: normalizedCz, seed, chunkSize: CHUNK_SIZE, chunkHeight: CHUNK_HEIGHT });
+    }
+}
+
+    chunkWorker.onmessage = (e) => {
+        const { cx, cz, blocks, error } = e.data;
+        const chunkKey = `${cx},${cz}`;
+        if (error) {
+            console.error(`Worker error for chunk ${chunkKey}:`, error);
+            setStatus(`Failed to generate chunk ${chunkKey}: ${error}`);
+            return;
+        }
+        if (!chunks[chunkKey]) {
+            chunks[chunkKey] = new THREE.Group();
+            scene.add(chunks[chunkKey]);
+        }
+        blocks.forEach(([x, y, z, blockId]) => {
+            if (blockId !== 0) {
+                const mesh = createBlockMesh(blockId);
+                mesh.position.set(cx * CHUNK_SIZE + x, y, cz * CHUNK_SIZE + z);
+                mesh.userData = { blockId, ownerAddress: '' };
+                chunks[chunkKey].add(mesh);
+            }
+        });
+    };
+
+    // IPFS and API Functions
+async function fetchIPFSFile(ipfsHash) {
+    if (!ipfsHash) {
+        console.warn(`[fetchIPFSFile] No IPFS hash provided`);
+        return null;
+    }
+    
+    const cidRegex = /^[A-Za-z0-9]{46}$|^[A-Za-z0-9]{59}$|^[a-z0-9]+$/;
+    if (!cidRegex.test(ipfsHash)) {
+        console.warn(`[fetchIPFSFile] Invalid IPFS hash: ${ipfsHash}`);
+        setStatus(`Invalid IPFS hash: ${ipfsHash}`);
+        return null;
+    }
+
+    if (IPFS_CACHE.has(ipfsHash)) {
+        console.log(`[fetchIPFSFile] Cache hit for IPFS hash ${ipfsHash}`);
+        return IPFS_CACHE.get(ipfsHash);
+    }
+    
+    const gateways = ['https://ipfs.io/ipfs/', 'https://cloudflare-ipfs.com/ipfs/'];
+    for (const gateway of gateways) {
+        const url = `${gateway}${ipfsHash}`;
+        console.log(`[fetchIPFSFile] Attempting to fetch IPFS file from ${url}`);
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+                console.warn(`[fetchIPFSFile] Timeout for ${url} after ${IPFS_FETCH_TIMEOUT_MS}ms`);
+            }, IPFS_FETCH_TIMEOUT_MS);
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`[fetchIPFSFile] Successfully fetched data from ${url}:`, data);
+                if (!data || typeof data !== 'object') {
+                    console.warn(`[fetchIPFSFile] Invalid JSON structure for ${ipfsHash}:`, data);
+                    return null;
+                }
+                console.log(`[fetchIPFSFile] Valid JSON structure for ${ipfsHash}:`, {
+                    hasChunks: !!data.chunks,
+                    hasProfile: !!data.profile,
+                    chunkCount: data.chunks ? Object.keys(data.chunks).length : 0
+                });
+                IPFS_CACHE.set(ipfsHash, data);
+                return data;
+            } else {
+                console.warn(`[fetchIPFSFile] HTTP error for ${url}: ${response.status} ${response.statusText}`);
+            }
+        } catch (err) {
+            console.warn(`[fetchIPFSFile] Error fetching ${url}:`, err.message);
+            setStatus(`Failed to fetch IPFS file ${ipfsHash}: ${err.message}`);
+        }
+    }
+    console.warn(`[fetchIPFSFile] All IPFS gateways failed for hash ${ipfsHash}`);
+    return null;
+}
+
+
+async function fetchIPFSFileOriginal(ipfsHash) {
+    if (!ipfsHash) return null;
+    
+    // Validate IPFS hash (CIDv0 starts with 'Qm' and is typically 46 chars, CIDv1 varies)
+    const cidRegex = /^[A-Za-z0-9]{46}$|^[A-Za-z0-9]{59}$|^[a-z0-9]+$/;
+    if (!cidRegex.test(ipfsHash)) {
+        console.warn(`Invalid IPFS hash: ${ipfsHash}`);
+        setStatus(`Invalid IPFS hash: ${ipfsHash}`);
+        return null;
+    }
+
+    if (IPFS_CACHE.has(ipfsHash)) return IPFS_CACHE.get(ipfsHash);
+    
+    const gateways = ['https://ipfs.io/ipfs/', 'https://cloudflare-ipfs.com/ipfs/'];
+    for (const gateway of gateways) {
+        const url = `${gateway}${ipfsHash}`;
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+                console.warn(`IPFS fetch timeout for ${url} after ${IPFS_FETCH_TIMEOUT_MS}ms`);
+            }, IPFS_FETCH_TIMEOUT_MS);
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (response.ok) {
+                const data = await response.json();
+                IPFS_CACHE.set(ipfsHash, data);
+                return data;
+            } else {
+                console.warn(`IPFS fetch failed for ${url}: HTTP ${response.status} ${response.statusText}`);
+            }
+        } catch (err) {
+            console.warn(`IPFS fetch error for ${url}:`, err);
+            setStatus(`Failed to fetch IPFS file ${ipfsHash}: ${err.message}`);
+        }
+    }
+    console.warn(`All IPFS gateways failed for hash ${ipfsHash}`);
+    return null;
+}
+
+async function applySaveFile(data, fromAddress, blockDate) {
+    if (!data || !data.chunks) {
+        console.warn(`[applySaveFile] Invalid or missing save data from ${fromAddress}:`, data);
+        return;
+    }
+    console.log(`[applySaveFile] Processing save file from ${fromAddress} at ${blockDate}:`, data);
+    const now = Date.now();
+    for (const [chunkKey, blocks] of Object.entries(data.chunks)) {
+        console.log(`[applySaveFile] Processing chunk ${chunkKey} with ${blocks.length} blocks`);
+        const [localCx, localCz] = chunkKey.split(',').map(Number);
+        if (!chunks[chunkKey]) {
+            console.log(`[applySaveFile] Generating chunk ${chunkKey} for update`);
+            generateChunk(localCx, localCz);
+        }
+        const claim = chunkClaims[chunkKey] || { ownerAddress: '', lastModified: 0, claimedAt: 0 };
+        console.log(`[applySaveFile] Chunk ${chunkKey} claim status:`, claim);
+        if (!claim.ownerAddress || claim.ownerAddress === fromAddress || now - claim.lastModified >= EXPIRY_DURATION) {
+            blocks.forEach(([localX, y, localZ, blockId], index) => {
+                console.log(`[applySaveFile] Updating block ${index + 1}/${blocks.length} in chunk ${chunkKey}: [${localX}, ${y}, ${localZ}] to blockId ${blockId}`);
+                const worldX = localCx * CHUNK_SIZE + localX;
+                const worldZ = localCz * CHUNK_SIZE + localZ;
+                updateBlock(localCx, localCz, worldX, y, worldZ, blockId, fromAddress, false);
+            });
+            chunkClaims[chunkKey] = { 
+                ownerAddress: fromAddress, 
+                lastModified: new Date(blockDate).getTime(), 
+                claimedAt: claim.claimedAt || new Date(blockDate).getTime() 
+            };
+            console.log(`[applySaveFile] Updated claim for chunk ${chunkKey}:`, chunkClaims[chunkKey]);
+        } else {
+            console.log(`[applySaveFile] Skipped chunk ${chunkKey}: Owned by ${claim.ownerAddress}, last modified ${new Date(claim.lastModified).toISOString()}`);
+        }
+    }
+    if (data.profile && fromAddress === userAddress) {
+        console.log(`[applySaveFile] Applying user profile for ${userAddress}:`, data.profile);
+        lastSavedPosition = new THREE.Vector3(...data.profile.position);
+        Object.assign(inventory, data.profile.inventory || {});
+        console.log(`[applySaveFile] Updated position to [${lastSavedPosition.x}, ${lastSavedPosition.y}, ${lastSavedPosition.z}], inventory:`, inventory);
+    } else {
+        console.log(`[applySaveFile] No profile data or not user's own save for ${fromAddress}`);
+    }
+}
+
+
+    async function applySaveFileOrignal(data, fromAddress, blockDate) {
+        if (!data || !data.chunks) return;
+        const now = Date.now();
+        for (const [chunkKey, blocks] of Object.entries(data.chunks)) {
+            const [localCx, localCz] = chunkKey.split(',').map(Number);
+            if (!chunks[chunkKey]) generateChunk(localCx, localCz);
+            const claim = chunkClaims[chunkKey] || { ownerAddress: '', lastModified: 0, claimedAt: 0 };
+            if (!claim.ownerAddress || claim.ownerAddress === fromAddress || now - claim.lastModified >= EXPIRY_DURATION) {
+                blocks.forEach(([localX, y, localZ, blockId]) => {
+                    const worldX = localCx * CHUNK_SIZE + localX;
+                    const worldZ = localCz * CHUNK_SIZE + localZ;
+                    updateBlock(localCx, localCz, worldX, y, worldZ, blockId, fromAddress, false);
+                });
+                chunkClaims[chunkKey] = { ownerAddress: fromAddress, lastModified: new Date(blockDate).getTime(), claimedAt: claim.claimedAt || new Date(blockDate).getTime() };
+            }
+        }
+        if (data.profile && fromAddress === userAddress) {
+            lastSavedPosition = new THREE.Vector3(...data.profile.position);
+            Object.assign(inventory, data.profile.inventory || {});
+        }
+    }
+
+   async function apiCall(endpoint, params = {}, retries = 3) {
+    const pathParams = params.path || {};
+    const queryParams = { mainnet: MAINNET.toString(), ...params.query };
+    const url = `${API_BASE}${endpoint.replace(/\{([^}]+)\}/g, (_, key) => pathParams[key] || '')}?${new URLSearchParams(queryParams)}`;
+    if (API_CACHE.has(url)) return API_CACHE.get(url);
+    let text = null;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+                console.warn(`API call to ${url} timed out after 10000ms on attempt ${attempt + 1}`);
+            }, 10000); // Increased timeout to 10s
+            const res = await fetch(url, { headers: { 'Accept': 'application/json' }, signal: controller.signal });
+            clearTimeout(timeoutId);
+            text = await res.text();
+            if (!res.ok) {
+                console.warn(`API error for ${url}: HTTP ${res.status} ${res.statusText}, Response: ${text}`);
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
+            let data;
+            if (endpoint.includes('/GetPublicAddressByKeyword')) {
+                try {
+                    const parsed = JSON.parse(text);
+                    if (typeof parsed === 'string' && parsed.match(/^[a-zA-Z0-9]{32,35}$/)) {
+                        data = { address: parsed };
+                    } else if (parsed && typeof parsed === 'object') {
+                        if ('address' in parsed) {
+                            data = parsed;
+                        } else if ('error' in parsed || Object.keys(parsed).length === 0) {
+                            console.warn(`API returned error or empty for ${url}:`, parsed);
+                            return null;
+                        } else {
+                            throw new Error('Invalid address format');
+                        }
+                    } else {
+                        throw new Error('Invalid response format');
+                    }
+                } catch {
+                    const trimmedText = text.trim();
+                    if (trimmedText && typeof trimmedText === 'string' && trimmedText.match(/^[a-zA-Z0-9]{32,35}$/)) {
+                        data = { address: trimmedText };
+                    } else {
+                        console.warn(`API invalid response for ${url}:`, JSON.stringify(text));
+                        return null;
+                    }
+                }
+            } else if (endpoint.includes('/GetKeywordByPublicAddress')) {
+                try {
+                    const parsed = JSON.parse(text);
+                    if (typeof parsed === 'string') {
+                        data = { keyword: parsed };
+                    } else if (parsed && typeof parsed === 'object' && 'keyword' in parsed) {
+                        data = parsed;
+                    } else if ('error' in parsed || Object.keys(parsed).length === 0) {
+                        console.warn(`API returned error or empty for ${url}:`, parsed);
+                        return null;
+                    } else {
+                        throw new Error('Invalid keyword format');
+                    }
+                } catch {
+                    const trimmedText = text.trim();
+                    if (trimmedText && typeof trimmedText === 'string') {
+                        data = { keyword: trimmedText };
+                    } else {
+                        console.warn(`API invalid response for ${url}:`, JSON.stringify(text));
+                        return null;
+                    }
+                }
+            } else {
+                try {
+                    data = JSON.parse(text);
+                } catch {
+                    console.warn(`API expected JSON for ${url}, got:`, text);
+                    throw new Error('Expected JSON response');
+                }
+            }
+            API_CACHE.set(url, data);
+            return data;
+        } catch (e) {
+            if (attempt < retries) {
+                console.warn(`Retrying ${url} (attempt ${attempt + 1}/${retries}):`, e.message);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                continue;
+            }
+            console.error(`API error for ${url}:`, e.message, `Response: ${text || 'none'}`);
+            setStatus(`API error for ${endpoint}: ${e.message}`);
+            return null;
+        }
+    }
+}
+
+    async function getUserAddressByURN(username) {
+        const profile = await apiCall('/GetProfileByURN/{username}', { path: { username } });
+        return profile?.Creators?.[0] || null;
+    }
+
+    async function getWorldsFromMaster() {
+        const addressRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: MASTER_KEYWORD } });
+        if (!addressRes?.address) {
+            console.warn(`No address for #${MASTER_KEYWORD}, returning empty world list`);
+            return [];
+        }
+        const messages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: addressRes.address }, query: { skip: 0, qty: 5000 } });
+        const worlds = [];
+        for (const msg of messages || []) {
+            const keywordRes = await apiCall('/GetKeywordByPublicAddress/{address}', { path: { address: msg.ToAddress } });
+            const keyword = keywordRes?.keyword;
+            if (keyword && keyword.startsWith('MCUserJoin@')) {
+                const worldName = keyword.split('@')[1];
+                if (worldName && /^\w{1,8}$/.test(worldName)) {
+                    const joinAddrRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword } });
+                    if (joinAddrRes?.address) {
+                        const joinMessages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: joinAddrRes.address }, query: { skip: 0, qty: 5000 } });
+                        if (joinMessages?.length) {
+                            worlds.push({ worldName, txId: joinMessages[0].TransactionId, creatorAddress: joinMessages[0].FromAddress });
+                        }
+                    }
+                }
+            }
+        }
+        return worlds;
+    }
+
+    async function getWorldSeed(worldName) {
+        const joinKW = `MCUserJoin@${worldName}`;
+        const addressRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: joinKW } });
+        if (!addressRes?.address) return null;
+        const messages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: addressRes.address }, query: { skip: 0, qty: 100000000 } });
+        if (!messages?.length) return null;
+        const firstMsg = messages[messages.length - 1];
+        const rootRes = await apiCall('/GetRootByTransactionId/{txId}', { path: { txId: firstMsg.TransactionId }, query: { verbose: false } });
+        if (rootRes?.Hash) {
+            const seed = hashString(rootRes.Hash);
+            return { seed, txId: firstMsg.TransactionId, hash: rootRes.Hash, creatorAddress: firstMsg.FromAddress };
+        }
+        return null;
+    }
+
+    // Helper function to calculate terrain height, matching generateChunk
+    function getTerrainHeight(noise, wx, wz) {
+        const height = Math.floor(noise.noise2D(wx / 50, wz / 50) * 20) + 63;
+        return height;
+    }
+
+    async function getPlayerHomeChunk(worldName, userAddress, txId) {
+    try {
+        const seedInput = userAddress + worldName;
+        const deterministicSeed = hashString(seedInput);
+        const noise = new window.SimplexNoise(deterministicSeed.toString());
+        const userHash = hashString(userAddress);
+        let attempt = 0;
+        let chunkKey, position;
+        const maxAttempts = 50;
+        const maxChunks = Math.floor(WORLD_SIZE / CHUNK_SIZE);
+
+        while (attempt < maxAttempts) {
+            const cx = Math.floor((noise.noise2D(attempt * 0.1 + userHash * 0.1, 0) + 1) * 0.5 * maxChunks);
+            const cz = Math.floor((noise.noise2D(attempt * 0.1 + userHash * 0.1, 1) + 1) * 0.5 * maxChunks);
+            const normalizedCx = ((cx % maxChunks) + maxChunks) % maxChunks;
+            const normalizedCz = ((cz % maxChunks) + maxChunks) % maxChunks;
+            chunkKey = `${normalizedCx},${normalizedCz}`;
+            const chunkKW = `${worldName}${normalizedCx.toString().padStart(6, '0')}${normalizedCz.toString().padStart(6, '0')}`;
+            const chunkAddr = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: chunkKW } });
+            const chunkMsgs = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: chunkAddr?.address }, query: { skip: 0, qty: 5000 } });
+
+            if (!chunkMsgs?.length || (chunkClaims[chunkKey] && chunkClaims[chunkKey].ownerAddress === userAddress)) {
+                const x = normalizedCx * CHUNK_SIZE + Math.floor((noise.noise2D(attempt * 0.1 + userHash * 0.1, 2) + 1) * 0.5 * CHUNK_SIZE);
+                const z = normalizedCz * CHUNK_SIZE + Math.floor((noise.noise2D(attempt * 0.1 + userHash * 0.1, 3) + 1) * 0.5 * CHUNK_SIZE);
+                const wx = ((x % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
+                const wz = ((z % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
+                const y = getTerrainHeight(noise, wx, wz) + 1;
+                if (!chunkClaims[chunkKey]) {
+                    chunkClaims[chunkKey] = { ownerAddress: userAddress, lastModified: Date.now(), claimedAt: Date.now() };
+                }
+                console.log(`Assigned deterministic home chunk ${chunkKey} for user ${userAddress} at position [${x}, ${y}, ${z}]`);
+                return { chunkKey, position: [x, y, z] };
+            }
+            attempt++;
+        }
+
+        const fallbackHash = deterministicSeed;
+        const cx = Math.floor((fallbackHash % maxChunks));
+        const cz = Math.floor(((fallbackHash >> 16) % maxChunks));
+        const normalizedCx = ((cx % maxChunks) + maxChunks) % maxChunks;
+        const normalizedCz = ((cz % maxChunks) + maxChunks) % maxChunks;
+        chunkKey = `${normalizedCx},${normalizedCz}`;
+        const x = normalizedCx * CHUNK_SIZE + Math.floor((noise.noise2D(userHash * 0.1, 2) + 1) * 0.5 * CHUNK_SIZE);
+        const z = normalizedCz * CHUNK_SIZE + Math.floor((noise.noise2D(userHash * 0.1, 3) + 1) * 0.5 * CHUNK_SIZE);
+        const wx = ((x % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
+        const wz = ((z % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
+        const y = getTerrainHeight(noise, wx, wz) + 1;
+        chunkClaims[chunkKey] = { ownerAddress: userAddress, lastModified: Date.now(), claimedAt: Date.now() };
+        console.log(`Assigned fallback deterministic home chunk ${chunkKey} for user ${userAddress} at position [${x}, ${y}, ${z}]`);
+        return { chunkKey, position: [x, y, z] };
+    } catch (err) {
+        console.error(`Error in getPlayerHomeChunk for ${worldName}:`, err);
+        setStatus(`Failed to calculate home chunk: ${err.message}. Using fallback position.`);
+        const fallbackHash = hashString(userAddress);
+        const maxChunks = Math.floor(WORLD_SIZE / CHUNK_SIZE);
+        const cx = Math.floor((fallbackHash % maxChunks));
+        const cz = Math.floor(((fallbackHash >> 16) % maxChunks));
+        const normalizedCx = ((cx % maxChunks) + maxChunks) % maxChunks;
+        const normalizedCz = ((cz % maxChunks) + maxChunks) % maxChunks;
+        chunkKey = `${normalizedCx},${normalizedCz}`;
+        const x = normalizedCx * CHUNK_SIZE + Math.floor((hashString(userAddress + 'x') % CHUNK_SIZE));
+        const z = normalizedCz * CHUNK_SIZE + Math.floor((hashString(userAddress + 'z') % CHUNK_SIZE));
+        const wx = ((x % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
+        const wz = ((z % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
+        const noiseFallback = new window.SimplexNoise(fallbackHash.toString());
+        const y = getTerrainHeight(noiseFallback, wx, wz) + 1;
+        chunkClaims[chunkKey] = { ownerAddress: userAddress, lastModified: Date.now(), claimedAt: Date.now() };
+        console.log(`Assigned error fallback home chunk ${chunkKey} for user ${userAddress} at position [${x}, ${y}, ${z}]`);
+        return { chunkKey, position: [x, y, z] };
+    }
+}
+
+    // World Initialization
+    async function initWorld() {
+        if (isWorldLoading) return;
+        isWorldLoading = true;
+        const hash = new URLSearchParams(window.location.hash.slice(1));
+        worldName = hash.get('worldName')?.trim();
+        joinKeyword = `MCUserJoin@${worldName}`;
+        if (!worldName || !/^\w{1,8}$/.test(worldName)) {
+            const worlds = await getWorldsFromMaster();
+            isWorldLoading = false;
+            if (!worlds.length) {
+                createWorldPrompt();
+                return;
+            }
+            showWorldSelectionPrompt(worlds);
+        } else {
+            const worldData = await getWorldSeed(worldName);
+            if (!worldData) {
+                isWorldLoading = false;
+                createWorldPrompt(worldName);
+                return;
+            }
+            username = new URLSearchParams(window.location.search).get('username') || '';
+            if (username) {
+                userAddress = await getUserAddressByURN(username);
+                if (userAddress) {
+                    const addressRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: joinKeyword } });
+                    if (addressRes?.address) {
+                        const messages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: addressRes.address }, query: { skip: 0, qty: 5000 } });
+                        if (messages?.some(msg => msg.FromAddress === userAddress)) {
+                            setStatus(`User ${username} found in #${worldName}. Loading...`);
+                            document.getElementById('loading-screen').classList.remove('hidden');
+                            await loadWorld(worldName, username, userAddress);
+                            isWorldLoading = false;
+                            return;
+                        }
+                    }
+                }
+            }
+            isWorldLoading = false;
+            showJoinPrompt(worldName);
+        }
+        if (!isPromptOpen) pollWorlds();
+    }
+
+    function showWorldSelectionPrompt(worlds) {
+        document.getElementById('loading-screen').classList.add('hidden');
+        isPromptOpen = true;
+        const promptDiv = document.createElement('div');
+        promptDiv.className = 'prompt';
+        promptDiv.innerHTML = `
+            <h2>Select a World</h2>
+            <select id="worldSelect">${worlds.map(w => `<option value="${w.worldName}">${w.worldName}</option>`).join('')}</select>
+            <input id="usernameInput" type="text" placeholder="Enter your username (e.g., embii4u)" />
+            <button id="joinWorldBtn">Join World</button>
+            <button id="createWorldBtn">Create New World</button>
+        `;
+        document.body.appendChild(promptDiv);
+        document.getElementById('joinWorldBtn').onclick = async () => {
+            worldName = document.getElementById('worldSelect').value;
+            username = document.getElementById('usernameInput').value.trim();
+            if (!username) {
+                setStatus('Please enter a username.');
+                return;
+            }
+            userAddress = await getUserAddressByURN(username);
+            if (!userAddress) {
+                promptDiv.remove();
+                isPromptOpen = false;
+                pollWorlds();
+                showJoinPrompt(worldName, username);
+                return;
+            }
+            joinKeyword = `MCUserJoin@${worldName}`;
+            const addressRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: joinKeyword } });
+            if (addressRes?.address) {
+                const messages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: addressRes.address }, query: { skip: 0, qty: 5000 } });
+                if (messages?.some(msg => msg.FromAddress === userAddress)) {
+                    setStatus(`User ${username} found in #${worldName}. Loading...`);
+                    document.getElementById('loading-screen').classList.remove('hidden');
+                    promptDiv.remove();
+                    isPromptOpen = false;
+                    pollWorlds();
+                    await loadWorld(worldName, username, userAddress);
+                    return;
+                }
+            }
+            promptDiv.remove();
+            isPromptOpen = false;
+            pollWorlds();
+            showJoinPrompt(worldName, username);
+        };
+        document.getElementById('createWorldBtn').onclick = () => {
+            promptDiv.remove();
+            isPromptOpen = false;
+            pollWorlds();
+            createWorldPrompt();
+        };
+        setTimeout(() => {
+            if (promptDiv.parentNode) {
+                promptDiv.remove();
+                isPromptOpen = false;
+                pollWorlds();
+                initWorld();
+            }
+        }, 60000);
+    }
+
+    function showJoinPrompt(worldName, prefilledUsername = '') {
+        document.getElementById('loading-screen').classList.add('hidden');
+        isPromptOpen = true;
+        const promptDiv = document.createElement('div');
+        promptDiv.className = 'prompt';
+        promptDiv.innerHTML = `
+            <h2>Join World #${worldName}</h2>
+            <p>Username: ${prefilledUsername || 'Unknown'}</p>
+            <textarea id="joinScript" readonly></textarea>
+            <button id="copyJoinScriptBtn">Copy Join Script</button>
+            <button id="cancelBtn">Cancel</button>
+            <p class="muted">Copy the addresses to the Sup!? To field to join the world.</p>
+        `;
+        document.body.appendChild(promptDiv);
+        
+        let pollingInterval = null;
+
+        const startPolling = async (joinKeyword, userAddress) => {
+            promptDiv.innerHTML = `
+                <h2>Join World #${worldName}</h2>
+                <p>Waiting for your join message at #${joinKeyword}...</p>
+                <textarea id="joinScript" readonly>${document.getElementById('joinScript').value}</textarea>
+                <button id="copyJoinScriptBtn">Copy Join Script</button>
+                <button id="cancelBtn">Cancel</button>
+                <p class="muted">Please paste the addresses into the Sup!? To field and send to join.</p>
+            `;
+            document.body.appendChild(promptDiv);
+            document.getElementById('copyJoinScriptBtn').onclick = async () => {
+                await navigator.clipboard.writeText(document.getElementById('joinScript').value);
+                setStatus('Join script copied to clipboard.');
+            };
+            document.getElementById('cancelBtn').onclick = stopPollingAndReset;
+            setStatus(`Waiting for new user message at #${joinKeyword}.`);
+
+            pollingInterval = setInterval(async () => {
+                try {
+                    const addressRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: joinKeyword } });
+                    if (addressRes?.address) {
+                        const messages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: addressRes.address }, query: { skip: 0, qty: 5000 } });
+                        if (messages?.some(msg => msg.FromAddress === userAddress)) {
+                            clearInterval(pollingInterval);
+                            pollingInterval = null;
+                            setStatus(`User ${username} found in #${worldName}. Loading...`);
+                            promptDiv.remove();
+                            isPromptOpen = false;
+                            pollWorlds();
+                            document.getElementById('loading-screen').classList.remove('hidden');
+                            await loadWorld(worldName, username, userAddress);
+                        }
+                    }
+                } catch (err) {
+                    console.warn(`Polling error for #${joinKeyword}:`, err);
+                    setStatus(`Error checking join status for #${joinKeyword}. Retrying...`);
+                }
+            }, 15000);
+        };
+
+        const stopPollingAndReset = () => {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+            promptDiv.remove();
+            isPromptOpen = false;
+            pollWorlds();
+            initWorld();
+        };
+
+        (async () => {
+            username = prefilledUsername;
+            if (!username) {
+                setStatus('No username provided.');
+                document.getElementById('joinScript').value = '';
+                return;
+            }
+            userAddress = await getUserAddressByURN(username);
+            if (!userAddress) {
+                setStatus('Invalid username or user not found.');
+                document.getElementById('joinScript').value = '';
+                return;
+            }
+            const masterAddrRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: MASTER_KEYWORD } });
+            const joinAddrRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: `MCUserJoin@${worldName}` } });
+            const masterAddr = masterAddrRes?.address;
+            const joinAddr = joinAddrRes?.address;
+            if (!masterAddr && !joinAddr) {
+                setStatus(`Failed to fetch addresses for #${MASTER_KEYWORD} and #MCUserJoin@${worldName}. Try again later.`);
+                document.getElementById('joinScript').value = '';
+                return;
+            }
+            const addresses = [joinAddr, masterAddr].filter(a => a).join(',');
+            document.getElementById('joinScript').value = addresses;
+            document.getElementById('copyJoinScriptBtn').onclick = async () => {
+                await navigator.clipboard.writeText(addresses);
+                setStatus('Join script copied to clipboard.');
+            };
+            document.getElementById('cancelBtn').onclick = stopPollingAndReset;
+            const addressRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: `MCUserJoin@${worldName}` } });
+            if (addressRes?.address) {
+                const messages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: addressRes.address }, query: { skip: 0, qty: 5000 } });
+                if (messages?.some(msg => msg.FromAddress === userAddress)) {
+                    setStatus(`User ${username} found in #${worldName}. Loading...`);
+                    promptDiv.remove();
+                    isPromptOpen = false;
+                    pollWorlds();
+                    document.getElementById('loading-screen').classList.remove('hidden');
+                    await loadWorld(worldName, username, userAddress);
+                    return;
+                }
+            }
+            startPolling(`MCUserJoin@${worldName}`, userAddress);
+        })();
+    }
+
+    function createWorldPrompt(defaultWorldName = '') {
+        document.getElementById('loading-screen').classList.add('hidden');
+        isPromptOpen = true;
+        const promptDiv = document.createElement('div');
+        promptDiv.className = 'prompt';
+        promptDiv.innerHTML = `
+            <h2>Create New World</h2>
+            <input id="worldNameInput" type="text" placeholder="Enter world name (max 8 chars)" value="${defaultWorldName}" />
+            <input id="usernameInput" type="text" placeholder="Enter your username (e.g., embii4u)" />
+            <textarea id="worldScript" readonly></textarea>
+            <button id="generateScriptBtn">Generate Script</button>
+            <button id="cancelBtn">Cancel</button>
+            <p class="muted">Copy the addresses to the Sup!? To field to create and join your world.</p>
+        `;
+        document.body.appendChild(promptDiv);
+        document.getElementById('generateScriptBtn').onclick = async () => {
+            worldName = document.getElementById('worldNameInput').value.trim();
+            username = document.getElementById('usernameInput').value.trim();
+            if (!worldName || !/^\w{1,8}$/.test(worldName)) {
+                setStatus('Enter valid world name (1-8 alphanumeric chars).');
+                return;
+            }
+            if (!username) {
+                setStatus('Please enter a username.');
+                return;
+            }
+            userAddress = await getUserAddressByURN(username);
+            if (!userAddress) {
+                setStatus('Invalid username or user not found.');
+                return;
+            }
+            const masterAddrRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: MASTER_KEYWORD } });
+            const joinAddrRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: `MCUserJoin@${worldName}` } });
+            const masterAddr = masterAddrRes?.address;
+            const joinAddr = joinAddrRes?.address;
+            if (!masterAddr && !joinAddr) {
+                setStatus(`Failed to fetch addresses for #${MASTER_KEYWORD} and #MCUserJoin@${worldName}. Try again later.`);
+                document.getElementById('worldScript').value = '';
+                return;
+            }
+            const addresses = [joinAddr, masterAddr].filter(a => a).join(',');
+            document.getElementById('worldScript').value = addresses;
+            setStatus(addresses
+                ? `Copy the addresses to Sup!? To field to create/join #${worldName}.`
+                : `Partial addresses fetched: ${joinAddr ? `#MCUserJoin@${worldName}` : ''}${masterAddr ? `, #${MASTER_KEYWORD}` : ''}. Try again or proceed.`);
+            promptDiv.remove();
+            isPromptOpen = false;
+            pollWorlds();
+            document.getElementById('loading-screen').classList.remove('hidden');
+            await loadWorld(worldName, username, userAddress);
+        };
+        document.getElementById('cancelBtn').onclick = () => {
+            promptDiv.remove();
+            isPromptOpen = false;
+            pollWorlds();
+            initWorld();
+        };
+        setTimeout(() => {
+            if (promptDiv.parentNode) {
+                promptDiv.remove();
+                isPromptOpen = false;
+                pollWorlds();
+                initWorld();
+            }
+        }, 60000);
+    }
+
+    async function loadWorld(worldNameParam, usernameParam, userAddressParam) {
+    if (isWorldLoading) return;
+    isWorldLoading = true;
+    API_CACHE.clear();
+    IPFS_CACHE.clear();
+    worldName = worldNameParam;
+    username = usernameParam;
+    userAddress = userAddressParam;
+    joinKeyword = `MCUserJoin@${worldName}`;
+    const worldData = await getWorldSeed(worldName);
+    if (!worldData) {
+        setStatus(`World #${worldName} not found. Create it?`);
+        document.getElementById('loading-screen').classList.add('hidden');
+        isWorldLoading = false;
+        createWorldPrompt(worldName);
+        return;
+    }
+    seed = worldData.seed;
+    const home = await getPlayerHomeChunk(worldName, userAddress, worldData.txId);
+    const cx = Math.floor((home?.position[0] || 0 + WORLD_SIZE) % WORLD_SIZE / CHUNK_SIZE);
+    const cz = Math.floor((home?.position[2] || 0 + WORLD_SIZE) % WORLD_SIZE / CHUNK_SIZE);
+    
+    initThree();
+    
+    // Load home chunk and surrounding chunks immediately
+    for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
+        for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
+            const chunkX = cx + dx;
+            const chunkZ = cz + dz;
+            generateChunk(chunkX, chunkZ, true);
+        }
+    }
+    
+    const terrainNoise = new window.SimplexNoise(seed.toString());
+    const wx = (home.position[0] + WORLD_SIZE) % WORLD_SIZE;
+    const wz = (home.position[2] + WORLD_SIZE) % WORLD_SIZE;
+    home.position[1] = getTerrainHeight(terrainNoise, wx, wz) + 1;
+
+    const addressRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: joinKeyword } });
+    if (addressRes?.address) {
+        const messages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: addressRes.address }, query: { skip: 0, qty: 5000 } });
+        for (const msg of messages || []) {
+            if (msg.FromAddress === userAddress) {
+                const cid = msg.Message.match(/IPFS:([A-Za-z0-9]+)/)?.[1];
+                if (cid) {
+                    try {
+                        const data = await fetchIPFSFile(cid);
+                        if (data?.profile?.position) {
+                            lastSavedPosition = new THREE.Vector3(...data.profile.position);
+                            Object.assign(inventory, data.profile.inventory || {});
+                            player.position.set(...data.profile.position);
+                            break;
+                        }
+                    } catch (err) {
+                        console.warn(`Failed to load user save ${cid} for ${userAddress}:`, err);
+                    }
+                }
+            }
+        }
+    }
+    
+    if (!lastSavedPosition) {
+        player.position.set(...home.position);
+        lastSavedPosition = player.position.clone().floor();
+        lastSavedChunkKey = home.chunkKey;
+    } else {
+        player.position.set(...lastSavedPosition);
+        lastSavedChunkKey = getChunkKey(player.position);
+    }
+    
+    if (!player.position || isNaN(player.position.x) || isNaN(player.position.y) || isNaN(player.position.z)) {
+        console.error('Invalid player position after initialization:', player.position);
+        setStatus('Error: Failed to set valid player position');
+        player.position.set(home.position[0], home.position[1], home.position[2]);
+    }
+    
+    camera.position.set(player.position.x, player.position.y + 1.6, player.position.z);
+    camera.rotation.order = 'YXZ';
+    
+    updateChunks();
+    pollChunks();
+    document.getElementById('loading-screen').classList.add('hidden');
+    isWorldLoading = false;
+    
+    //setStatus(`X:${Math.floor(player.position.x)} Y:${Math.floor(player.position.y)} Z:${Math.floor(player.position.z)} | User ${username} in #${worldName}`);
+    
+    window.location.hash = `worldName=${worldName}`;
+}
+
+    async function pollWorlds() {
+        if (pollInterval) clearInterval(pollInterval);
+        if (isPromptOpen) return;
+        pollInterval = setInterval(async () => {
+            if (isPromptOpen) return;
+            const worlds = await getWorldsFromMaster();
+            if (worldName && worlds.some(w => w.worldName === worldName)) {
+                const worldData = await getWorldSeed(worldName);
+                if (worldData && !seed) {
+                    setStatus(`World #${worldName} found! Loading...`);
+                    document.getElementById('loading-screen').classList.remove('hidden');
+                    if (document.querySelector('.prompt')) {
+                        document.querySelector('.prompt').remove();
+                        isPromptOpen = false;
+                    }
+                    await loadWorld(worldName, username, userAddress);
+                }
+            }
+        }, POLL_INTERVAL);
+    }
+
+async function pollChunks() {
+    if (pollInterval) clearInterval(pollInterval);
+    if (isPromptOpen) return;
+    pollInterval = setInterval(async () => {
+        if (isPromptOpen) return;
+        console.log(`[pollChunks] Starting poll for world ${worldName}, user ${userAddress}`);
+        const cx = Math.floor((player.position.x + WORLD_SIZE) % WORLD_SIZE / CHUNK_SIZE);
+        const cz = Math.floor((player.position.z + WORLD_SIZE) % WORLD_SIZE / CHUNK_SIZE);
+        const chunkMessages = [];
+        for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
+            for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
+                const chunkX = cx + dx;
+                const chunkZ = cz + dz;
+                const chunkKey = `${chunkX},${chunkZ}`;
+                const chunkKW = `${worldName}${chunkX.toString().padStart(6, '0')}${chunkZ.toString().padStart(6, '0')}`;
+                console.log(`[pollChunks] Checking chunk ${chunkKey} with keyword #${chunkKW}`);
+                const addressRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: chunkKW } });
+                if (addressRes?.address) {
+                    console.log(`[pollChunks] Found address ${addressRes.address} for #${chunkKW}`);
+                    const messages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: addressRes.address }, query: { skip: 0, qty: 5000 } });
+                    console.log(`[pollChunks] Retrieved ${messages?.length || 0} messages for chunk ${chunkKey}`);
+                    for (const msg of messages || []) {
+                        console.log(`[pollChunks] Processing message for chunk ${chunkKey}:`, {
+                            FromAddress: msg.FromAddress,
+                            Message: msg.Message,
+                            BlockDate: msg.BlockDate,
+                            TransactionId: msg.TransactionId
+                        });
+                        chunkMessages.push({ chunkKey, message: msg });
+                        const cidMatch = msg.Message.match(/IPFS:([A-Za-z0-9]+)/);
+                        const cid = cidMatch?.[1];
+                        if (cid) {
+                            const cidRegex = /^[A-Za-z0-9]{46}$|^[A-Za-z0-9]{59}$|^[a-z0-9]+$/;
+                            if (!cidRegex.test(cid)) {
+                                console.warn(`[pollChunks] Invalid CID in message for chunk ${chunkKey}: ${cid}`);
+                                continue;
+                            }
+                            console.log(`[pollChunks] Found valid CID ${cid} for chunk ${chunkKey} from ${msg.FromAddress} at ${msg.BlockDate}`);
+                            try {
+                                const data = await fetchIPFSFile(cid);
+                                if (data) {
+                                    console.log(`[pollChunks] Successfully fetched IPFS data for CID ${cid}:`, data);
+                                    await applySaveFile(data, msg.FromAddress, msg.BlockDate);
+                                    console.log(`[pollChunks] Applied save file for chunk ${chunkKey} from CID ${cid}`);
+                                } else {
+                                    console.warn(`[pollChunks] No valid data fetched for IPFS CID ${cid} in chunk ${chunkKey}`);
+                                }
+                            } catch (err) {
+                                console.warn(`[pollChunks] Failed to process IPFS file ${cid} for chunk ${chunkKey}:`, err);
+                            }
+                        } else {
+                            console.log(`[pollChunks] No IPFS CID found in message for chunk ${chunkKey}`);
+                        }
+                    }
+                } else {
+                    console.log(`[pollChunks] No address found for #${chunkKW}`);
+                }
+            }
+        }
+        console.log(`[pollChunks] Checking user join messages for #${joinKeyword}`);
+        const addressRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: joinKeyword } });
+        if (addressRes?.address) {
+            console.log(`[pollChunks] Found address ${addressRes.address} for #${joinKeyword}`);
+            const messages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: addressRes.address }, query: { skip: 0, qty: 5000 } });
+            console.log(`[pollChunks] Retrieved ${messages?.length || 0} user join messages for ${userAddress}`);
+            for (const msg of messages || []) {
+                if (msg.FromAddress === userAddress) {
+                    console.log(`[pollChunks] Processing user join message:`, {
+                        FromAddress: msg.FromAddress,
+                        Message: msg.Message,
+                        BlockDate: msg.BlockDate,
+                        TransactionId: msg.TransactionId
+                    });
+                    chunkMessages.push({ chunkKey: 'user_join', message: msg });
+                    const cidMatch = msg.Message.match(/IPFS:([A-Za-z0-9]+)/);
+                    const cid = cidMatch?.[1];
+                    if (cid) {
+                        const cidRegex = /^[A-Za-z0-9]{46}$|^[A-Za-z0-9]{59}$|^[a-z0-9]+$/;
+                        if (!cidRegex.test(cid)) {
+                            console.warn(`[pollChunks] Invalid CID in user message for ${userAddress}: ${cid}`);
+                            continue;
+                        }
+                        console.log(`[pollChunks] Found valid CID ${cid} for user ${userAddress} at ${msg.BlockDate}`);
+                        try {
+                            const data = await fetchIPFSFile(cid);
+                            if (data) {
+                                console.log(`[pollChunks] Successfully fetched IPFS data for user CID ${cid}:`, data);
+                                await applySaveFile(data, msg.FromAddress, msg.BlockDate);
+                                console.log(`[pollChunks] Applied user save file for ${userAddress} from CID ${cid}`);
+                            } else {
+                                console.warn(`[pollChunks] No valid data fetched for IPFS CID ${cid} for user ${userAddress}`);
+                            }
+                        } catch (err) {
+                            console.warn(`[pollChunks] Failed to process IPFS file ${cid} for user ${userAddress}:`, err);
+                        }
+                    } else {
+                        console.log(`[pollChunks] No IPFS CID found in user join message for ${userAddress}`);
+                    }
+                }
+            }
+        } else {
+            console.log(`[pollChunks] No address found for #${joinKeyword}`);
+        }
+        console.log(`[pollChunks] Message thread processed:`, chunkMessages);
+    }, POLL_INTERVAL);
+}
+
+
+
+    async function pollChunksOriginal() {
+    if (pollInterval) clearInterval(pollInterval);
+    if (isPromptOpen) return;
+    pollInterval = setInterval(async () => {
+        if (isPromptOpen) return;
+        const cx = Math.floor((player.position.x + WORLD_SIZE) % WORLD_SIZE / CHUNK_SIZE);
+        const cz = Math.floor((player.position.z + WORLD_SIZE) % WORLD_SIZE / CHUNK_SIZE);
+        for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
+            for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
+                const chunkX = cx + dx;
+                const chunkZ = cz + dz;
+                const chunkKey = `${chunkX},${chunkZ}`;
+                const chunkKW = `${worldName}${chunkX.toString().padStart(6, '0')}${chunkZ.toString().padStart(6, '0')}`;
+                const addressRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: chunkKW } });
+                if (addressRes?.address) {
+                    const messages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: addressRes.address }, query: { skip: 0, qty: 5000 } });
+                    for (const msg of messages || []) {
+                        const cidMatch = msg.Message.match(/IPFS:([A-Za-z0-9]+)/);
+                        const cid = cidMatch?.[1];
+                        if (cid) {
+                            // Validate CID before fetching
+                            const cidRegex = /^[A-Za-z0-9]{46}$|^[A-Za-z0-9]{59}$|^[a-z0-9]+$/;
+                            if (!cidRegex.test(cid)) {
+                                console.warn(`Invalid CID in message for chunk ${chunkKey}: ${cid}`);
+                                continue;
+                            }
+                            try {
+                                const data = await fetchIPFSFile(cid);
+                                if (data) {
+                                    await applySaveFile(data, msg.FromAddress, msg.BlockDate);
+                                } else {
+                                    console.warn(`No valid data fetched for IPFS CID ${cid} in chunk ${chunkKey}`);
+                                }
+                            } catch (err) {
+                                console.warn(`Failed to process IPFS file ${cid} for chunk ${chunkKey}:`, err);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        const addressRes = await apiCall('/GetPublicAddressByKeyword/{keyword}', { path: { keyword: joinKeyword } });
+        if (addressRes?.address) {
+            const messages = await apiCall('/GetPublicMessagesByAddress/{address}', { path: { address: addressRes.address }, query: { skip: 0, qty: 5000 } });
+            for (const msg of messages || []) {
+                if (msg.FromAddress === userAddress) {
+                    const cidMatch = msg.Message.match(/IPFS:([A-Za-z0-9]+)/);
+                    const cid = cidMatch?.[1];
+                    if (cid) {
+                        // Validate CID before fetching
+                        const cidRegex = /^[A-Za-z0-9]{46}$|^[A-Za-z0-9]{59}$|^[a-z0-9]+$/;
+                        if (!cidRegex.test(cid)) {
+                            console.warn(`Invalid CID in user message for ${userAddress}: ${cid}`);
+                            continue;
+                        }
+                        try {
+                            const data = await fetchIPFSFile(cid);
+                            if (data) {
+                                await applySaveFile(data, msg.FromAddress, msg.BlockDate);
+                            } else {
+                                console.warn(`No valid data fetched for IPFS CID ${cid} for user ${userAddress}`);
+                            }
+                        } catch (err) {
+                            console.warn(`Failed to process IPFS file ${cid} for user ${userAddress}:`, err);
+                        }
+                    }
+                }
+            }
+        }
+    }, POLL_INTERVAL);
+}
+
+    function updateBlock(cx, cz, x, y, z, blockId, fromAddress, isPlayerAction = true) {
+        const chunkKey = `${cx},${cz}`;
+        if (isPlayerAction && !canModifyChunk(chunkKey, userAddress)) return;
+        const chunk = chunks[chunkKey];
+        if (!chunk) return;
+        const block = chunk.children.find(b => b.position.x === x && b.position.y === y && b.position.z === z);
+        if (blockId === 0) {
+            if (block) {
+                scene.remove(block);
+                chunk.children = chunk.children.filter(b => b !== block);
+                if (isPlayerAction) markModifiedBlock(chunkKey, x, y, z, 0);
+            }
+        } else {
+            if (block) {
+                block.material.color.set(BLOCK_TYPES[blockId].color);
+                block.userData.blockId = blockId;
+                block.userData.ownerAddress = fromAddress;
+                block.visible = BLOCK_TYPES[blockId].visible !== false;
+                if (isPlayerAction) markModifiedBlock(chunkKey, x, y, z, blockId);
+            } else {
+                const newBlock = createBlockMesh(blockId);
+                if (newBlock) {
+                    newBlock.position.set(x, y, z);
+                    newBlock.userData = { blockId, ownerAddress: fromAddress };
+                    chunk.add(newBlock);
+                    scene.add(newBlock);
+                    if (isPlayerAction) markModifiedBlock(chunkKey, x, y, z, blockId);
+                }
+            }
+        }
+    }
+
+    function updateChunks() {
+    // Ensure player and position exist
+    if (!player || !player.position || isNaN(player.position.x) || isNaN(player.position.z)) {
+        console.error('Invalid player position:', player?.position);
+        setStatus('Error: Invalid player position');
+        return;
+    }
+
+    // Normalize player position to stay within [0, WORLD_SIZE)
+    player.position.x = ((player.position.x % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
+    player.position.z = ((player.position.z % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
+
+    const cx = Math.floor(player.position.x / CHUNK_SIZE);
+    const cz = Math.floor(player.position.z / CHUNK_SIZE);
+    const newChunks = new Set();
+
+    // Load chunks within render distance, accounting for world wrapping
+    for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
+        for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
+            const chunkX = ((cx + dx) % Math.floor(WORLD_SIZE / CHUNK_SIZE) + Math.floor(WORLD_SIZE / CHUNK_SIZE)) % Math.floor(WORLD_SIZE / CHUNK_SIZE);
+            const chunkZ = ((cz + dz) % Math.floor(WORLD_SIZE / CHUNK_SIZE) + Math.floor(WORLD_SIZE / CHUNK_SIZE)) % Math.floor(WORLD_SIZE / CHUNK_SIZE);
+            const chunkKey = `${chunkX},${chunkZ}`;
+            newChunks.add(chunkKey);
+
+            if (!(chunkKey in chunks)) {
+                generateChunk(chunkX, chunkZ, false);
+            } else {
+                chunks[chunkKey].children.forEach(block => {
+                    block.frustumCulled = true;
+                });
+            }
+        }
+    }
+
+    // Unload chunks outside render distance
+    for (const chunkKey in chunks) {
+        if (!newChunks.has(chunkKey)) {
+            scene.remove(chunks[chunkKey]);
+            delete chunks[chunkKey];
+        }
+    }
+}
+
+    function animate() {
+    requestAnimationFrame(animate);
+    if (!player || !scene || !camera || !renderer) return;
+
+    velocity.x *= 0.2;
+    velocity.z *= 0.2;
+
+    if (moveForward || moveBackward || moveLeft || moveRight) {
+        const forwardDir = new THREE.Vector3();
+        camera.getWorldDirection(forwardDir);
+        forwardDir.y = 0;
+        forwardDir.normalize();
+
+        const rightDir = new THREE.Vector3();
+        rightDir.copy(forwardDir).cross(new THREE.Vector3(0, 1, 0)).normalize();
+
+        const moveDir = new THREE.Vector3();
+        if (moveForward) moveDir.add(forwardDir);
+        if (moveBackward) moveDir.sub(forwardDir);
+        if (moveLeft) moveDir.sub(rightDir);
+        if (moveRight) moveDir.add(rightDir);
+
+        moveDir.normalize().multiplyScalar(speed);
+        velocity.x = moveDir.x;
+        velocity.z = moveDir.z;
+    }
+
+    velocity.y += gravity;
+    player.position.add(velocity);
+
+    // Normalize player position
+    player.position.x = ((player.position.x % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
+    player.position.z = ((player.position.z % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
+
+    try {
+        const groundY = Math.floor(new window.SimplexNoise(seed.toString()).noise2D(player.position.x / 50, player.position.z / 50) * 20) + 64;
+        if (player.position.y <= groundY) {
+            player.position.y = groundY;
+            velocity.y = 0;
+            canJump = true;
+        } else {
+            canJump = false;
+        }
+    } catch (err) {
+        console.error('Error in animate ground check:', err);
+        if (player.position.y <= 64) {
+            player.position.y = 64;
+            velocity.y = 0;
+            canJump = true;
+        } else {
+            canJump = false;
+        }
+    }
+    velocity.multiplyScalar(0.9);
+    camera.position.copy(player.position);
+    camera.position.y += 1.6;
+
+    const currentBlockPos = player.position.clone().floor();
+    if (!lastBlockPos || !currentBlockPos.equals(lastBlockPos)) {
+        lastBlockPos = currentBlockPos.clone();
+        updateStatusDisplay();
+    }
+
+    updateChunks();
+    renderer.render(scene, camera);
+}
+
+    initWorld();
+});
+</script></body>
+</html>
