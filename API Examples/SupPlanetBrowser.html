@@ -285,6 +285,7 @@
 
             let scene, camera, renderer, player, chunks = {}, modifiedChunks = new Set(), modifiedBlocks = {};
             let chunkClaims = {}, seed, username, worldName, userAddress, joinKeyword;
+            let chunkData = {};
             let isWorldLoading = false, pollInterval = null, isPromptOpen = false;
             let lastSavedPosition = null, lastSavedChunkKey = null, inventory = { grass: 0, dirt: 0, stone: 0 };
             let velocity = new THREE.Vector3(), direction = new THREE.Vector3();
@@ -648,7 +649,8 @@
                     if (event.button === 0 && intersects.length > 0) {
                         const intersect = intersects[0];
                         const block = intersect.object;
-                        const blockPos = block.position.clone().floor();
+                        let blockPos = block.position.clone().floor();
+                        blockPos = normalizePos(blockPos);
                         const dist = distanceToPlayer(blockPos);
                         if (dist > MAX_INTERACT_DISTANCE) {
                             setStatus(`Too far to break (distance ${dist.toFixed(1)} > ${MAX_INTERACT_DISTANCE})`);
@@ -661,14 +663,23 @@
                         }
                         scene.remove(block);
                         chunks[chunkKey].children = chunks[chunkKey].children.filter(b => b !== block);
+                        const [cxStr, czStr] = chunkKey.split(',');
+                        const cx = parseInt(cxStr), cz = parseInt(czStr);
+                        const lx = blockPos.x - cx * CHUNK_SIZE;
+                        const lz = blockPos.z - cz * CHUNK_SIZE;
+                        const ly = blockPos.y;
+                        const index = (lx * CHUNK_HEIGHT + ly) * CHUNK_SIZE + lz;
+                        if (chunkData[chunkKey]) chunkData[chunkKey][index] = 0;
                         inventory[BLOCK_TYPES[block.userData.blockId].name]++;
                         markModifiedBlock(chunkKey, blockPos.x, blockPos.y, blockPos.z, 0);
                     } else if (event.button === 2 && intersects.length > 0) {
                         const intersect = intersects[0];
                         const block = intersect.object;
-                        const blockPos = block.position.clone().floor();
+                        let blockPos = block.position.clone().floor();
+                        blockPos = normalizePos(blockPos);
                         const normal = intersect.face.normal;
-                        const placePos = blockPos.clone().add(normal);
+                        let placePos = blockPos.clone().add(normal).floor();
+                        placePos = normalizePos(placePos);
                         const chunkKey = getChunkKey(placePos);
                         if (!(chunkKey in chunks)) return;
                         if (!canModifyChunk(chunkKey, userAddress)) {
@@ -683,17 +694,29 @@
                             setStatus(`No ${selectedBlockType} in inventory.`);
                             return;
                         }
-                        const mesh = createBlockMesh(BLOCK_ID_MAP[selectedBlockType]);
+                        const placeId = BLOCK_ID_MAP[selectedBlockType];
+                        const [cxStr, czStr] = chunkKey.split(',');
+                        const cx = parseInt(cxStr), cz = parseInt(czStr);
+                        const lx = placePos.x - cx * CHUNK_SIZE;
+                        const lz = placePos.z - cz * CHUNK_SIZE;
+                        const ly = placePos.y;
+                        const index = (lx * CHUNK_HEIGHT + ly) * CHUNK_SIZE + lz;
+                        if (!chunkData[chunkKey]) {
+                            chunkData[chunkKey] = new Uint8Array(CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE);
+                        }
+                        chunkData[chunkKey][index] = placeId;
+                        const mesh = createBlockMesh(placeId);
                         mesh.position.copy(placePos);
-                        mesh.userData = { blockId: BLOCK_ID_MAP[selectedBlockType], ownerAddress: userAddress };
+                        mesh.userData = { blockId: placeId, ownerAddress: userAddress };
                         chunks[chunkKey].add(mesh);
                         scene.add(mesh);
                         inventory[selectedBlockType]--;
-                        markModifiedBlock(chunkKey, placePos.x, placePos.y, placePos.z, BLOCK_ID_MAP[selectedBlockType]);
+                        markModifiedBlock(chunkKey, placePos.x, placePos.y, placePos.z, placeId);
                     }
                 });
                 document.addEventListener('contextmenu', (e) => e.preventDefault());
             }
+
 
             function createBlockMesh(blockId) {
                 if (blockId === 0) return null;
@@ -776,7 +799,69 @@
                 document.getElementById('save-modal').style.display = 'block';
             }
 
+            function normalizePos(pos) {
+                pos.x = ((pos.x % WORLD_SIZE + WORLD_SIZE) % WORLD_SIZE);
+                pos.z = ((pos.z % WORLD_SIZE + WORLD_SIZE) % WORLD_SIZE);
+                return pos;
+            }
 
+            function getBlockIdAt(wx, wy, wz) {
+                wx = Math.floor(wx);
+                wy = Math.floor(wy);
+                wz = Math.floor(wz);
+                const worldX = ((wx + WORLD_SIZE) % WORLD_SIZE);
+                const worldZ = ((wz + WORLD_SIZE) % WORLD_SIZE);
+                const cx = Math.floor(worldX / CHUNK_SIZE);
+                const cz = Math.floor(worldZ / CHUNK_SIZE);
+                const thisChunkKey = chunkKey(cx, cz);
+                const lx = worldX - cx * CHUNK_SIZE;
+                const lz = worldZ - cz * CHUNK_SIZE;
+                if (lx < 0 || lx >= CHUNK_SIZE || lz < 0 || lz >= CHUNK_SIZE || wy < 0 || wy >= CHUNK_HEIGHT) return 0;
+                if (!chunkData[thisChunkKey]) {
+                    const noise = new window.SimplexNoise(seed.toString());
+                    const height = Math.floor(noise.noise2D(worldX / 50, worldZ / 50) * 20) + 63;
+                    if (wy > height) return 0;
+                    if (wy < height - 3) return 3;
+                    else if (wy < height - 1) return 2;
+                    else if (wy === height) return 1;
+                    return 0;
+                }
+                const index = (lx * CHUNK_HEIGHT + wy) * CHUNK_SIZE + lz;
+                return chunkData[thisChunkKey][index] || 0;
+            }
+
+            function getHighestBlockY(px, pz) {
+                const bx = Math.floor(px);
+                const bz = Math.floor(pz);
+                const worldX = ((bx + WORLD_SIZE) % WORLD_SIZE);
+                const worldZ = ((bz + WORLD_SIZE) % WORLD_SIZE);
+                const cx = Math.floor(worldX / CHUNK_SIZE);
+                const cz = Math.floor(worldZ / CHUNK_SIZE);
+                const thisChunkKey = `${cx},${cz}`; // Inline chunkKey to avoid reference issues
+                const lx = worldX - cx * CHUNK_SIZE;
+                const lz = worldZ - cz * CHUNK_SIZE;
+                if (lx < 0 || lx >= CHUNK_SIZE || lz < 0 || lz >= CHUNK_SIZE) return -1;
+                if (!chunkData[thisChunkKey]) {
+                    const noise = new window.SimplexNoise(seed.toString());
+                    return Math.floor(noise.noise2D(worldX / 50, worldZ / 50) * 20) + 63;
+                }
+                for (let y = CHUNK_HEIGHT - 1; y >= 0; y--) {
+                    const index = (lx * CHUNK_HEIGHT + y) * CHUNK_SIZE + lz;
+                    if (chunkData[thisChunkKey][index] !== 0) {
+                        return y;
+                    }
+                }
+                return -1;
+            }
+
+
+            function isSafeToMoveTo(px, py, pz) {
+                const bx = Math.floor(px);
+                const bz = Math.floor(pz);
+                const by1 = Math.floor(py);
+                const by2 = by1 + 1;
+                return getBlockIdAt(bx, by1, bz) === 0 && getBlockIdAt(bx, by2, bz) === 0;
+            }
 
             function generateChunk(cx, cz, immediate = false) {
                 // Validate inputs
@@ -795,6 +880,9 @@
 
                 chunks[chunkKey] = new THREE.Group();
                 scene.add(chunks[chunkKey]);
+                if (!chunkData[chunkKey]) {
+                    chunkData[chunkKey] = new Uint8Array(CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE);
+                }
 
                 if (immediate) {
                     try {
@@ -811,6 +899,8 @@
                                     else if (y < height - 1) blockId = 2; // Dirt
                                     else if (y === height) blockId = 1; // Grass
                                     if (blockId !== 0) {
+                                        const index = (x * CHUNK_HEIGHT + y) * CHUNK_SIZE + z;
+                                        chunkData[chunkKey][index] = blockId;
                                         const mesh = createBlockMesh(blockId);
                                         mesh.position.set(normalizedCx * CHUNK_SIZE + x, y, normalizedCz * CHUNK_SIZE + z);
                                         mesh.userData = { blockId, ownerAddress: '' };
@@ -840,10 +930,15 @@
                     chunks[chunkKey] = new THREE.Group();
                     scene.add(chunks[chunkKey]);
                 }
-                blocks.forEach(([x, y, z, blockId]) => {
+                if (!chunkData[chunkKey]) {
+                    chunkData[chunkKey] = new Uint8Array(CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE);
+                }
+                blocks.forEach(([lx, ly, lz, blockId]) => {
                     if (blockId !== 0) {
+                        const index = (lx * CHUNK_HEIGHT + ly) * CHUNK_SIZE + lz;
+                        chunkData[chunkKey][index] = blockId;
                         const mesh = createBlockMesh(blockId);
-                        mesh.position.set(cx * CHUNK_SIZE + x, y, cz * CHUNK_SIZE + z);
+                        mesh.position.set(cx * CHUNK_SIZE + lx, ly, cz * CHUNK_SIZE + lz);
                         mesh.userData = { blockId, ownerAddress: '' };
                         chunks[chunkKey].add(mesh);
                     }
@@ -1645,38 +1740,66 @@
             }
 
 
-
             function updateBlock(cx, cz, x, y, z, blockId, fromAddress, isPlayerAction = true) {
-                const chunkKey = `${cx},${cz}`;
-                if (isPlayerAction && !canModifyChunk(chunkKey, userAddress)) return;
-                const chunk = chunks[chunkKey];
-                if (!chunk) return;
-                const block = chunk.children.find(b => b.position.x === x && b.position.y === y && b.position.z === z);
+                const thisChunkKey = `${cx},${cz}`; // Inline chunkKey
+                const chunk = chunks[thisChunkKey];
+                if (!chunk) {
+                    console.warn(`Chunk ${thisChunkKey} does not exist for block update at (${x}, ${y}, ${z})`);
+                    return;
+                }
+                const lx = x - cx * CHUNK_SIZE;
+                const lz = z - cz * CHUNK_SIZE;
+                if (lx < 0 || lx >= CHUNK_SIZE || lz < 0 || lz >= CHUNK_SIZE || y < 0 || y >= CHUNK_HEIGHT) {
+                    console.warn(`Invalid block coordinates: (${lx}, ${y}, ${lz}) in chunk ${thisChunkKey}`);
+                    return;
+                }
+                if (!chunkData[thisChunkKey]) {
+                    chunkData[thisChunkKey] = new Uint8Array(CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE);
+                }
+                const index = (lx * CHUNK_HEIGHT + y) * CHUNK_SIZE + lz;
+                chunkData[thisChunkKey][index] = blockId; // Update chunkData first
+                if (isPlayerAction && !canModifyChunk(thisChunkKey, userAddress)) {
+                    console.warn(`User ${userAddress} cannot modify chunk ${thisChunkKey}`);
+                    chunkData[thisChunkKey][index] = 0; // Revert if unauthorized
+                    return;
+                }
+                const blockPos = new THREE.Vector3(x, y, z);
+                const block = chunk.children.find(b => b.position.equals(blockPos));
                 if (blockId === 0) {
                     if (block) {
-                        scene.remove(block);
-                        chunk.children = chunk.children.filter(b => b !== block);
-                        if (isPlayerAction) markModifiedBlock(chunkKey, x, y, z, 0);
+                        chunk.remove(block); // Remove from chunk
+                        scene.remove(block); // Remove from scene
+                        block.geometry.dispose();
+                        block.material.dispose();
                     }
+                    if (isPlayerAction) markModifiedBlock(thisChunkKey, x, y, z, 0);
                 } else {
                     if (block) {
+                        // Update existing block
                         block.material.color.set(BLOCK_TYPES[blockId].color);
                         block.userData.blockId = blockId;
                         block.userData.ownerAddress = fromAddress;
                         block.visible = BLOCK_TYPES[blockId].visible !== false;
-                        if (isPlayerAction) markModifiedBlock(chunkKey, x, y, z, blockId);
                     } else {
+                        // Create new block
                         const newBlock = createBlockMesh(blockId);
                         if (newBlock) {
-                            newBlock.position.set(x, y, z);
+                            newBlock.position.copy(blockPos);
                             newBlock.userData = { blockId, ownerAddress: fromAddress };
                             chunk.add(newBlock);
                             scene.add(newBlock);
-                            if (isPlayerAction) markModifiedBlock(chunkKey, x, y, z, blockId);
+                        } else {
+                            console.error(`Failed to create block mesh for blockId ${blockId} at (${x}, ${y}, ${z})`);
+                            chunkData[thisChunkKey][index] = 0; // Revert if mesh creation fails
+                            return;
                         }
                     }
+                    if (isPlayerAction) markModifiedBlock(thisChunkKey, x, y, z, blockId);
                 }
+                // Log for debugging
+                console.log(`Updated block at (${x}, ${y}, ${z}) in chunk ${thisChunkKey} to blockId ${blockId}`);
             }
+
 
             function updateChunks() {
                 // Ensure player and position exist
@@ -1721,6 +1844,7 @@
                 }
             }
 
+
             function animate() {
                 requestAnimationFrame(animate);
                 if (!player || !scene || !camera || !renderer) return;
@@ -1742,38 +1866,91 @@
                     if (moveBackward) moveDir.sub(forwardDir);
                     if (moveLeft) moveDir.sub(rightDir);
                     if (moveRight) moveDir.add(rightDir);
-
-                    moveDir.normalize().multiplyScalar(speed);
+                    if (moveDir.length() > 0) {
+                        moveDir.normalize().multiplyScalar(speed);
+                    }
                     velocity.x = moveDir.x;
                     velocity.z = moveDir.z;
                 }
 
-                velocity.y += gravity;
-                player.position.add(velocity);
+                // Apply horizontal movement with collision
+                const dx = velocity.x;
+                const dz = velocity.z;
+                const oldX = player.position.x;
+                const oldZ = player.position.z;
+                const oldY = player.position.y;
 
-                // Normalize player position
-                player.position.x = ((player.position.x % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
-                player.position.z = ((player.position.z % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
-
-                try {
-                    const groundY = Math.floor(new window.SimplexNoise(seed.toString()).noise2D(player.position.x / 50, player.position.z / 50) * 20) + 64;
-                    if (player.position.y <= groundY) {
-                        player.position.y = groundY;
+                // X movement with step-up
+                const testX = oldX + dx;
+                if (isSafeToMoveTo(testX, oldY, oldZ) && isSafeToMoveTo(testX, oldY + 1, oldZ)) {
+                    player.position.x = testX;
+                } else {
+                    const thighest = getHighestBlockY(testX, oldZ);
+                    const tground = thighest !== -1 ? thighest + 1 : -1;
+                    const chighest = getHighestBlockY(oldX, oldZ);
+                    const cground = chighest !== -1 ? chighest + 1 : -1;
+                    if (tground !== -1 && cground !== -1 && tground <= cground + 1 && velocity.y <= 0) {
+                        player.position.x = testX;
+                        player.position.y = tground + 0.01; // Slight offset to prevent falling through
                         velocity.y = 0;
                         canJump = true;
                     } else {
+                        velocity.x = 0;
+                    }
+                }
+
+                // Z movement with step-up
+                const testZ = oldZ + dz;
+                if (isSafeToMoveTo(player.position.x, oldY, testZ) && isSafeToMoveTo(player.position.x, oldY + 1, testZ)) {
+                    player.position.z = testZ;
+                } else {
+                    const thighest = getHighestBlockY(player.position.x, testZ);
+                    const tground = thighest !== -1 ? thighest + 1 : -1;
+                    const chighest = getHighestBlockY(player.position.x, oldZ);
+                    const cground = chighest !== -1 ? chighest + 1 : -1;
+                    if (tground !== -1 && cground !== -1 && tground <= cground + 1 && velocity.y <= 0) {
+                        player.position.z = testZ;
+                        player.position.y = tground + 0.01; // Slight offset to prevent falling through
+                        velocity.y = 0;
+                        canJump = true;
+                    } else {
+                        velocity.z = 0;
+                    }
+                }
+
+                // Normalize horizontal position
+                player.position.x = ((player.position.x % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
+                player.position.z = ((player.position.z % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
+
+                // Vertical movement with ground collision
+                velocity.y += gravity;
+                player.position.y += velocity.y;
+
+                // Ground collision check
+                try {
+                    const highestBlockY = getHighestBlockY(player.position.x, player.position.z);
+                    const groundLevel = highestBlockY !== -1 ? highestBlockY + 1 : -1;
+                    if (groundLevel !== -1 && player.position.y <= groundLevel + 0.01) {
+                        player.position.y = groundLevel + 0.01; // Slight offset to prevent sinking
+                        velocity.y = 0;
+                        canJump = true;
+                    } else if (player.position.y > groundLevel) {
                         canJump = false;
                     }
                 } catch (err) {
-                    console.error('Error in animate ground check:', err);
-                    if (player.position.y <= 64) {
-                        player.position.y = 64;
+                    console.error('Error in ground check:', err);
+                    const noise = new window.SimplexNoise(seed.toString());
+                    const height = Math.floor(noise.noise2D(player.position.x / 50, player.position.z / 50) * 20) + 63;
+                    const groundLevel = height + 1;
+                    if (player.position.y <= groundLevel + 0.01) {
+                        player.position.y = groundLevel + 0.01;
                         velocity.y = 0;
                         canJump = true;
                     } else {
                         canJump = false;
                     }
                 }
+
                 velocity.multiplyScalar(0.9);
                 camera.position.copy(player.position);
                 camera.position.y += 1.6;
