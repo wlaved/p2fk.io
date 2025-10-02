@@ -660,7 +660,6 @@
                             return;
                         }
                         scene.remove(block);
-                        block.userData.boundingBox = null;
                         chunks[chunkKey].children = chunks[chunkKey].children.filter(b => b !== block);
                         inventory[BLOCK_TYPES[block.userData.blockId].name]++;
                         markModifiedBlock(chunkKey, blockPos.x, blockPos.y, blockPos.z, 0);
@@ -686,8 +685,6 @@
                         }
                         const mesh = createBlockMesh(BLOCK_ID_MAP[selectedBlockType]);
                         mesh.position.copy(placePos);
-                        mesh.geometry.computeBoundingBox();
-                        mesh.userData.boundingBox = mesh.geometry.boundingBox.clone().translate(mesh.position);
                         mesh.userData = { blockId: BLOCK_ID_MAP[selectedBlockType], ownerAddress: userAddress };
                         chunks[chunkKey].add(mesh);
                         scene.add(mesh);
@@ -704,24 +701,7 @@
                 const mat = new THREE.MeshStandardMaterial({ color: BLOCK_TYPES[blockId].color, flatShading: true });
                 const mesh = new THREE.Mesh(geo, mat);
                 mesh.visible = BLOCK_TYPES[blockId].visible !== false;
-
-                // Add bounding box for collision
-                geo.computeBoundingBox();
-                mesh.userData.boundingBox = geo.boundingBox.clone().translate(mesh.position);
-
                 return mesh;
-            }
-
-            function checkCollision(position) {
-                for (const chunk of Object.values(chunks)) {
-                    for (const block of chunk.children) {
-                        const box = block.userData?.boundingBox;
-                        if (box && box.containsPoint(position)) {
-                            return true;
-                        }
-                    }
-                }
-                return false;
             }
 
             // Save File Generation
@@ -1768,14 +1748,8 @@
                     velocity.z = moveDir.z;
                 }
 
-
                 velocity.y += gravity;
-                //player.position.add(velocity);
-                const proposedPosition = player.position.clone().add(velocity);
-                if (!checkCollision(proposedPosition)) {
-                    player.position.copy(proposedPosition);
-                }
-
+                player.position.add(velocity);
 
                 // Normalize player position
                 player.position.x = ((player.position.x % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
