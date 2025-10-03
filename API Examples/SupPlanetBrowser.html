@@ -270,10 +270,10 @@
             const CHUNK_SIZE = 16;
             const CHUNK_HEIGHT = 256;
             const WORLD_SIZE = 999999;
-            const RENDER_DISTANCE = 3; // Loads 5x5 chunk grid
+            const RENDER_DISTANCE = 2; // Loads 5x5 chunk grid
             const POLL_INTERVAL = 15000; // 15s
             const IPFS_FETCH_TIMEOUT_MS = 10000;
-            const CLAIM_DURATION = 30 * 24 * 60 * 60 * 1000; // does this even work!?
+            const CLAIM_DURATION = 30 * 24 * 60 * 60 * 1000; // save for later
             const EXPIRY_DURATION = 365 * 24 * 60 * 60 * 1000;
             const BLOCK_TYPES = {
                 0: { name: 'air', color: 0x000000, visible: false },
@@ -291,7 +291,7 @@
             let lastSavedPosition = null, lastSavedChunkKey = null, inventory = { grass: 0, dirt: 0, stone: 0 };
             let velocity = new THREE.Vector3(), direction = new THREE.Vector3();
             let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, canJump = false;
-            let speed = 0.4, jumpVelocity = 0.5, gravity = -0.03, yaw = 0, pitch = 0, mouseSensitivity = 0.002;
+            let speed = 0.6, jumpVelocity = 0.7, gravity = -0.03, yaw = 0, pitch = 0, mouseSensitivity = 0.002;
             let selectedBlockType = 'stone';
             let mainRaycaster = new THREE.Raycaster(), centerPointer = new THREE.Vector2(0, 0);
             let lastStatusText = '', lastBlockPos = null;
@@ -662,15 +662,24 @@
                             setStatus('Cannot break block in this chunk.');
                             return;
                         }
+                        // Remove block from scene and chunk
                         scene.remove(block);
                         chunks[chunkKey].children = chunks[chunkKey].children.filter(b => b !== block);
+                        block.geometry.dispose();
+                        block.material.dispose();
+                        // Update chunkData
                         const [cxStr, czStr] = chunkKey.split(',');
                         const cx = parseInt(cxStr), cz = parseInt(czStr);
                         const lx = blockPos.x - cx * CHUNK_SIZE;
                         const lz = blockPos.z - cz * CHUNK_SIZE;
                         const ly = blockPos.y;
                         const index = (lx * CHUNK_HEIGHT + ly) * CHUNK_SIZE + lz;
-                        if (chunkData[chunkKey]) chunkData[chunkKey][index] = 0;
+                        if (chunkData[chunkKey]) {
+                            chunkData[chunkKey][index] = 0;
+                            console.log(`Block removed at (${blockPos.x}, ${blockPos.y}, ${blockPos.z}) in chunk ${chunkKey}, index ${index}, chunkData[${index}] = ${chunkData[chunkKey][index]}`);
+                        } else {
+                            console.error(`chunkData[${chunkKey}] not found during block removal at (${blockPos.x}, ${blockPos.y}, ${blockPos.z})`);
+                        }
                         inventory[BLOCK_TYPES[block.userData.blockId].name]++;
                         markModifiedBlock(chunkKey, blockPos.x, blockPos.y, blockPos.z, 0);
                     } else if (event.button === 2 && intersects.length > 0) {
@@ -713,11 +722,11 @@
                         scene.add(mesh);
                         inventory[selectedBlockType]--;
                         markModifiedBlock(chunkKey, placePos.x, placePos.y, placePos.z, placeId);
+                        console.log(`Block placed at (${placePos.x}, ${placePos.y}, ${placePos.z}) in chunk ${chunkKey}, index ${index}, chunkData[${index}] = ${chunkData[chunkKey][index]}`);
                     }
                 });
                 document.addEventListener('contextmenu', (e) => e.preventDefault());
             }
-
 
             function createBlockMesh(blockId) {
                 if (blockId === 0) return null;
@@ -817,19 +826,99 @@
                 const thisChunkKey = chunkKey(cx, cz);
                 const lx = worldX - cx * CHUNK_SIZE;
                 const lz = worldZ - cz * CHUNK_SIZE;
-                if (lx < 0 || lx >= CHUNK_SIZE || lz < 0 || lz >= CHUNK_SIZE || wy < 0 || wy >= CHUNK_HEIGHT) return 0;
-                if (!chunkData[thisChunkKey]) {
-                    const noise = new window.SimplexNoise(seed.toString());
-                    const height = Math.floor(noise.noise2D(worldX / 50, worldZ / 50) * 20) + 63;
-                    if (wy > height) return 0;
-                    if (wy < height - 3) return 3;
-                    else if (wy < height - 1) return 2;
-                    else if (wy === height) return 1;
+                if (lx < 0 || lx >= CHUNK_SIZE || lz < 0 || lz >= CHUNK_SIZE || wy < 0 || wy >= CHUNK_HEIGHT) {
+                    console.log(`Out-of-bounds block check at (${wx}, ${wy}, ${wz}) in chunk ${thisChunkKey}`);
                     return 0;
                 }
-                const index = (lx * CHUNK_HEIGHT + wy) * CHUNK_SIZE + lz;
-                return chunkData[thisChunkKey][index] || 0;
+                if (chunkData[thisChunkKey]) {
+                    const index = (lx * CHUNK_HEIGHT + wy) * CHUNK_SIZE + lz;
+                    const blockId = chunkData[thisChunkKey][index] || 0;
+                    console.log(`getBlockIdAt (${wx}, ${wy}, ${wz}) in chunk ${thisChunkKey}, index ${index} -> blockId ${blockId}`);
+                    return blockId;
+                }
+                // Fallback to procedural generation if chunkData is not loaded
+                const noise = new window.SimplexNoise(seed.toString());
+                const height = Math.floor(noise.noise2D(worldX / 50, worldZ / 50) * 20) + 63;
+                if (wy > height) return 0;
+                if (wy < height - 3) return 3;
+                else if (wy < height - 1) return 2;
+                else if (wy === height) return 1;
+                return 0;
             }
+
+
+
+            // Player collision constants (tweak if you prefer)
+            const PLAYER_HEIGHT = 1.6;    // how tall the player's collision box is (feet -> top)
+            const PLAYER_RADIUS = 0.05;    // half-width (cylinder->approx with box)
+            const STEP_HEIGHT = 0;      // max step up allowed
+            const EPSILON = 1e-3;
+
+            // Build AABB for player feet position (pos is feet position vector)
+            function getPlayerAABB(pos) {
+                return {
+                    minX: pos.x - PLAYER_RADIUS,
+                    maxX: pos.x + PLAYER_RADIUS,
+                    minY: pos.y,
+                    maxY: pos.y + PLAYER_HEIGHT,
+                    minZ: pos.z - PLAYER_RADIUS,
+                    maxZ: pos.z + PLAYER_RADIUS
+                };
+            }
+
+            // Check whether an axis-aligned bounding box collides with any solid block
+            function aabbCollides(aabb) {
+                // floor ranges (we test integer block coordinates inside AABB)
+                const minX = Math.floor(aabb.minX);
+                const maxX = Math.floor(Math.max(aabb.maxX - EPSILON, aabb.minX));
+                const minY = Math.floor(Math.max(aabb.minY, 0));
+                const maxY = Math.floor(Math.min(aabb.maxY - EPSILON, CHUNK_HEIGHT - 1));
+                const minZ = Math.floor(aabb.minZ);
+                const maxZ = Math.floor(Math.max(aabb.maxZ - EPSILON, aabb.minZ));
+
+                for (let x = minX; x <= maxX; x++) {
+                    for (let y = minY; y <= maxY; y++) {
+                        for (let z = minZ; z <= maxZ; z++) {
+                            if (getBlockIdAt(x, y, z) !== 0) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+
+            // Returns true if player's AABB at proposed feetPos would be free (no collision)
+            function canOccupyPosition(feetPos) {
+                const aabb = getPlayerAABB(feetPos);
+                return !aabbCollides(aabb);
+            }
+
+            // Search downward from startY (feet Y) up to maxDown (positive number) for a supporting block top Y.
+            // Returns topY (integer) of the highest block found directly under player's footprint, or null if none found within range.
+            function findSupportingBlockY(feetX, startY, feetZ, maxDown = 4) {
+                // scan integral columns under player's radius - but to be conservative, test center point
+                const cx = Math.floor(feetX);
+                const cz = Math.floor(feetZ);
+
+                // We'll check integer y from floor(startY) down to floor(startY) - maxDown
+                const startSearchY = Math.floor(startY);
+                for (let y = startSearchY; y >= Math.max(0, startSearchY - maxDown); y--) {
+                    // We consider a block *supporting* the player if that block is solid and the block above it is free
+                    const belowId = getBlockIdAt(cx, y, cz);
+                    const aboveId = getBlockIdAt(cx, y + 1, cz);
+                    if (belowId !== 0 && aboveId === 0) {
+                        return y; // block top is y
+                    }
+                }
+                return null;
+            }
+
+
+
+
+
+
 
             function getHighestBlockY(px, pz) {
                 const bx = Math.floor(px);
@@ -838,30 +927,39 @@
                 const worldZ = ((bz + WORLD_SIZE) % WORLD_SIZE);
                 const cx = Math.floor(worldX / CHUNK_SIZE);
                 const cz = Math.floor(worldZ / CHUNK_SIZE);
-                const thisChunkKey = `${cx},${cz}`; // Inline chunkKey to avoid reference issues
+                const thisChunkKey = `${cx},${cz}`;
                 const lx = worldX - cx * CHUNK_SIZE;
                 const lz = worldZ - cz * CHUNK_SIZE;
-                if (lx < 0 || lx >= CHUNK_SIZE || lz < 0 || lz >= CHUNK_SIZE) return -1;
-                if (!chunkData[thisChunkKey]) {
-                    const noise = new window.SimplexNoise(seed.toString());
-                    return Math.floor(noise.noise2D(worldX / 50, worldZ / 50) * 20) + 63;
+                if (lx < 0 || lx >= CHUNK_SIZE || lz < 0 || lz >= CHUNK_SIZE) {
+                    console.log(`Out-of-bounds highest block check at (${bx}, ${bz}) in chunk ${thisChunkKey}`);
+                    return -1;
                 }
-                for (let y = CHUNK_HEIGHT - 1; y >= 0; y--) {
-                    const index = (lx * CHUNK_HEIGHT + y) * CHUNK_SIZE + lz;
-                    if (chunkData[thisChunkKey][index] !== 0) {
-                        return y;
+                if (chunkData[thisChunkKey]) {
+                    for (let y = CHUNK_HEIGHT - 1; y >= 0; y--) {
+                        const index = (lx * CHUNK_HEIGHT + y) * CHUNK_SIZE + lz;
+                        if (chunkData[thisChunkKey][index] !== 0) {
+                            console.log(`Highest block at (${bx}, ${y}, ${bz}) in chunk ${thisChunkKey}, index ${index}`);
+                            return y;
+                        }
                     }
+                    console.log(`No solid blocks found at (${bx}, ${bz}) in chunk ${thisChunkKey}`);
+                    return -1;
                 }
-                return -1;
+                // Fallback to procedural generation
+                const noise = new window.SimplexNoise(seed.toString());
+                const height = Math.floor(noise.noise2D(worldX / 50, worldZ / 50) * 20) + 63;
+                console.log(`Procedural height at (${bx}, ${bz}) -> ${height}`);
+                return height;
             }
-
 
             function isSafeToMoveTo(px, py, pz) {
                 const bx = Math.floor(px);
+                const by = Math.floor(py - 0.1); // Adjust for grounding offset
                 const bz = Math.floor(pz);
-                const by1 = Math.floor(py);
-                const by2 = by1 + 1;
-                return getBlockIdAt(bx, by1, bz) === 0 && getBlockIdAt(bx, by2, bz) === 0;
+                const feetSafe = getBlockIdAt(bx, by, bz) === 0;
+                const headSafe = getBlockIdAt(bx, by + 1, bz) === 0;
+                console.log(`isSafeToMoveTo (${px.toFixed(2)}, ${py.toFixed(2)}, ${pz.toFixed(2)}) at block (${bx}, ${by}, ${bz}) -> feet: ${feetSafe} (blockId: ${getBlockIdAt(bx, by, bz)}), head: ${headSafe} (blockId: ${getBlockIdAt(bx, by + 1, bz)})`);
+                return feetSafe && headSafe;
             }
 
             function generateChunk(cx, cz, immediate = false) {
@@ -1838,126 +1936,155 @@
                 }
             }
 
-
             function animate() {
-                requestAnimationFrame(animate);
-                if (!player || !scene || !camera || !renderer) return;
+    requestAnimationFrame(animate);
+    if (!player || !scene || !camera || !renderer) return;
 
-                velocity.x *= 0.2;
-                velocity.z *= 0.2;
+    // Apply friction to horizontal velocity (input damping)
+    velocity.x *= 0.2;
+    velocity.z *= 0.2;
 
-                if (moveForward || moveBackward || moveLeft || moveRight) {
-                    const forwardDir = new THREE.Vector3();
-                    camera.getWorldDirection(forwardDir);
-                    forwardDir.y = 0;
-                    forwardDir.normalize();
+    // Calculate movement direction from input
+    if (moveForward || moveBackward || moveLeft || moveRight) {
+        const forwardDir = new THREE.Vector3();
+        camera.getWorldDirection(forwardDir);
+        forwardDir.y = 0;
+        forwardDir.normalize();
 
-                    const rightDir = new THREE.Vector3();
-                    rightDir.copy(forwardDir).cross(new THREE.Vector3(0, 1, 0)).normalize();
+        const rightDir = new THREE.Vector3();
+        rightDir.copy(forwardDir).cross(new THREE.Vector3(0, 1, 0)).normalize();
 
-                    const moveDir = new THREE.Vector3();
-                    if (moveForward) moveDir.add(forwardDir);
-                    if (moveBackward) moveDir.sub(forwardDir);
-                    if (moveLeft) moveDir.sub(rightDir);
-                    if (moveRight) moveDir.add(rightDir);
-                    if (moveDir.length() > 0) {
-                        moveDir.normalize().multiplyScalar(speed);
-                    }
-                    velocity.x = moveDir.x;
-                    velocity.z = moveDir.z;
+        const moveDir = new THREE.Vector3();
+        if (moveForward) moveDir.add(forwardDir);
+        if (moveBackward) moveDir.sub(forwardDir);
+        if (moveLeft) moveDir.sub(rightDir);
+        if (moveRight) moveDir.add(rightDir);
+        if (moveDir.length() > 0) {
+            moveDir.normalize().multiplyScalar(speed);
+        }
+        velocity.x = moveDir.x;
+        velocity.z = moveDir.z;
+    }
+
+    const maxSpeed = 0.1;
+    velocity.x = Math.max(Math.min(velocity.x, maxSpeed), -maxSpeed);
+    velocity.z = Math.max(Math.min(velocity.z, maxSpeed), -maxSpeed);
+
+    // --- Robust movement + step + vertical collision ---
+
+    const oldX = player.position.x;
+    const oldY = player.position.y;
+    const oldZ = player.position.z;
+
+    const desiredX = oldX + velocity.x;
+    const desiredZ = oldZ + velocity.z;
+
+    // Proposed new feet positions (we only change X/Z for now)
+    const proposePosXZ = new THREE.Vector3(desiredX, oldY, desiredZ);
+
+    if (canOccupyPosition(proposePosXZ)) {
+        // Free at current height
+        player.position.x = desiredX;
+        player.position.z = desiredZ;
+    } else {
+        // Try stepping up
+        let stepped = false;
+        for (let step = 0.1; step <= STEP_HEIGHT + EPSILON; step += 0.1) {
+            const testPos = new THREE.Vector3(desiredX, oldY + step, desiredZ);
+            if (canOccupyPosition(testPos)) {
+                const supportY = findSupportingBlockY(testPos.x, testPos.y, testPos.z, Math.ceil(step + 1));
+                if (supportY !== null) {
+                    player.position.x = desiredX;
+                    player.position.z = desiredZ;
+                    player.position.y = supportY + 1;
+                    velocity.y = 0;
+                    canJump = true;
+                    stepped = true;
+                    break;
                 }
-
-                // Apply horizontal movement with collision
-                const dx = velocity.x;
-                const dz = velocity.z;
-                const oldX = player.position.x;
-                const oldZ = player.position.z;
-                const oldY = player.position.y;
-
-                // X movement with step-up
-                const testX = oldX + dx;
-                if (isSafeToMoveTo(testX, oldY, oldZ) && isSafeToMoveTo(testX, oldY + 1, oldZ)) {
-                    player.position.x = testX;
-                } else {
-                    const thighest = getHighestBlockY(testX, oldZ);
-                    const tground = thighest !== -1 ? thighest + 1 : -1;
-                    const chighest = getHighestBlockY(oldX, oldZ);
-                    const cground = chighest !== -1 ? chighest + 1 : -1;
-                    if (tground !== -1 && cground !== -1 && tground <= cground + 1 && velocity.y <= 0) {
-                        player.position.x = testX;
-                        player.position.y = tground + 0.01; // Slight offset to prevent falling through
-                        velocity.y = 0;
-                        canJump = true;
-                    } else {
-                        velocity.x = 0;
-                    }
-                }
-
-                // Z movement with step-up
-                const testZ = oldZ + dz;
-                if (isSafeToMoveTo(player.position.x, oldY, testZ) && isSafeToMoveTo(player.position.x, oldY + 1, testZ)) {
-                    player.position.z = testZ;
-                } else {
-                    const thighest = getHighestBlockY(player.position.x, testZ);
-                    const tground = thighest !== -1 ? thighest + 1 : -1;
-                    const chighest = getHighestBlockY(player.position.x, oldZ);
-                    const cground = chighest !== -1 ? chighest + 1 : -1;
-                    if (tground !== -1 && cground !== -1 && tground <= cground + 1 && velocity.y <= 0) {
-                        player.position.z = testZ;
-                        player.position.y = tground + 0.01; // Slight offset to prevent falling through
-                        velocity.y = 0;
-                        canJump = true;
-                    } else {
-                        velocity.z = 0;
-                    }
-                }
-
-                // Normalize horizontal position
-                player.position.x = ((player.position.x % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
-                player.position.z = ((player.position.z % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
-
-                // Vertical movement with ground collision
-                velocity.y += gravity;
-                player.position.y += velocity.y;
-
-                // Ground collision check
-                try {
-                    const highestBlockY = getHighestBlockY(player.position.x, player.position.z);
-                    const groundLevel = highestBlockY !== -1 ? highestBlockY + 1 : -1;
-                    if (groundLevel !== -1 && player.position.y <= groundLevel + 0.01) {
-                        player.position.y = groundLevel + 0.01; // Slight offset to prevent sinking
-                        velocity.y = 0;
-                        canJump = true;
-                    } else if (player.position.y > groundLevel) {
-                        canJump = false;
-                    }
-                } catch (err) {
-                    console.error('Error in ground check:', err);
-                    const noise = new window.SimplexNoise(seed.toString());
-                    const height = Math.floor(noise.noise2D(player.position.x / 50, player.position.z / 50) * 20) + 63;
-                    const groundLevel = height + 1;
-                    if (player.position.y <= groundLevel + 0.01) {
-                        player.position.y = groundLevel + 0.01;
-                        velocity.y = 0;
-                        canJump = true;
-                    } else {
-                        canJump = false;
-                    }
-                }
-
-                velocity.multiplyScalar(0.9);
-                camera.position.copy(player.position);
-                camera.position.y += 1.6;
-
-                const currentBlockPos = player.position.clone().floor();
-                if (!lastBlockPos || !currentBlockPos.equals(lastBlockPos)) {
-                    lastBlockPos = currentBlockPos.clone();
-                    updateStatusDisplay();
-                }
-
-                updateChunks();
-                renderer.render(scene, camera);
             }
+        }
+        if (!stepped) {
+            velocity.x = 0;
+            velocity.z = 0;
+        }
+    }
+
+    // Normalize position into world bounds
+    player.position.x = ((player.position.x % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
+    player.position.z = ((player.position.z % WORLD_SIZE) + WORLD_SIZE) % WORLD_SIZE;
+
+    // Apply vertical velocity (gravity)
+    velocity.y += gravity;
+    const newY = player.position.y + velocity.y;
+
+    const proposeFeetPos = new THREE.Vector3(player.position.x, newY, player.position.z);
+    if (canOccupyPosition(proposeFeetPos)) {
+        // Space free -> move
+        player.position.y = newY;
+        canJump = false;
+    } else {
+        if (velocity.y > 0) {
+            // Rising into ceiling
+            let settledY = player.position.y;
+            for (let yCheck = Math.floor(newY); yCheck >= Math.floor(player.position.y); yCheck--) {
+                const testPos = new THREE.Vector3(player.position.x, yCheck - EPSILON, player.position.z);
+                if (canOccupyPosition(testPos)) {
+                    settledY = testPos.y;
+                    break;
+                }
+            }
+            player.position.y = settledY;
+            velocity.y = 0;
+        } else {
+            // Falling -> find ground
+            const supportY = findSupportingBlockY(player.position.x, player.position.y + Math.max(0, velocity.y), player.position.z, 6);
+            if (supportY !== null) {
+                player.position.y = supportY + 1;
+                velocity.y = 0;
+                canJump = true;
+            } else {
+                player.position.y = newY;
+                canJump = false;
+            }
+        }
+    }
+
+    // Ceiling check (avoid clipping)
+    const ceilingCheckY = Math.floor(player.position.y + PLAYER_HEIGHT);
+    if (getBlockIdAt(player.position.x, ceilingCheckY, player.position.z) !== 0) {
+        player.position.y = ceilingCheckY - PLAYER_HEIGHT - EPSILON;
+        velocity.y = Math.min(0, velocity.y);
+    }
+
+    // Limit jump height relative to local ground
+    const localSupport = findSupportingBlockY(player.position.x, player.position.y, player.position.z, 6);
+    const currentGroundLevel = (localSupport !== null ? localSupport + 1 : null);
+    if (currentGroundLevel !== null) {
+        const maxJumpY = currentGroundLevel + 2.1;
+        if (player.position.y > maxJumpY && velocity.y > 0) {
+            player.position.y = maxJumpY;
+            velocity.y = 0;
+        }
+    }
+
+    // Apply friction
+    velocity.x *= 0.9;
+    velocity.z *= 0.9;
+    velocity.y *= 0.99;
+
+    // Update camera and render
+    camera.position.copy(player.position);
+    camera.position.y += 1.6;
+    const currentBlockPos = player.position.clone().floor();
+    if (!lastBlockPos || !currentBlockPos.equals(lastBlockPos)) {
+        lastBlockPos = currentBlockPos.clone();
+        updateStatusDisplay();
+    }
+    updateChunks();
+    renderer.render(scene, camera);
+}
+
 
             initWorld();
         });
