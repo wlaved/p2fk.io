@@ -577,8 +577,10 @@
                 scene = new THREE.Scene();
                 scene.fog = new THREE.FogExp2(0x87ceeb, 0.0025);
                 camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 500);
-                renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+                renderer = new THREE.WebGLRenderer({ antialias: true });
                 renderer.setPixelRatio(window.devicePixelRatio || 1);
+                renderer.setClearColor(0x87ceeb); // Sky blue background
+                renderer.sortObjects = true; // Ensure correct object sorting
                 renderer.setSize(window.innerWidth, window.innerHeight);
                 renderer.outputEncoding = THREE.sRGBEncoding;
                 document.body.appendChild(renderer.domElement);
